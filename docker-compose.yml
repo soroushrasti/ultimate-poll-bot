@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres
+    container_name: soroush
+    environment:
+      POSTGRES_USER: soroush
+      POSTGRES_PASSWORD: soroush
+      POSTGRES_DB: soroush
+    ports:
+      - "5432:5432"
