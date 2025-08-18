@@ -23,7 +23,49 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = context.user
     query = update.inline_query.query.strip()
 
-    # Check if it's a direct poll ID share
+    # Check if it's a direct poll share with "share_" prefix
+    if query.startswith("share_"):
+        try:
+            poll_id = int(query.replace("share_", ""))
+            poll = session.query(Poll).get(poll_id)
+
+            if poll and not poll.deleted:
+                # Create a shareable poll result that any user can interact with
+                from pollbot.display.poll.compilation import get_poll_text_and_vote_keyboard
+
+                # Get poll text and voting keyboard for external users
+                poll_text, vote_keyboard = get_poll_text_and_vote_keyboard(session, poll, None)
+
+                # Ensure we have valid text
+                if not poll_text or poll_text.strip() == "":
+                    poll_text = f"📊 *{poll.name}*"
+                    if poll.description:
+                        poll_text += f"\n\n{poll.description}"
+                    poll_text += "\n\nClick to vote!"
+
+                # Create the shareable content
+                content = InputTextMessageContent(
+                    message_text=poll_text,
+                    parse_mode='Markdown'
+                )
+
+                results = [
+                    InlineQueryResultArticle(
+                        id=f"share_{poll.id}",
+                        title=f"📊 {poll.name}",
+                        description=f"Share this poll • {len(poll.options)} options • {sum(len(option.votes) for option in poll.options)} votes",
+                        input_message_content=content,
+                        reply_markup=vote_keyboard,
+                        thumb_url="https://telegram.org/img/t_logo.png"  # Optional: add a thumb
+                    )
+                ]
+
+                await update.inline_query.answer(results, cache_time=0)  # No cache for sharing
+                return
+        except (ValueError, AttributeError):
+            pass
+
+    # Check if it's a direct poll ID share (legacy support)
     if query.isdigit():
         poll_id = int(query)
         poll = session.query(Poll).get(poll_id)
@@ -31,8 +73,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if poll and not poll.deleted:
             # Create a shareable poll result
             from pollbot.display.poll.compilation import get_poll_text_and_vote_keyboard
-
-            poll_text, vote_keyboard = get_poll_text_and_vote_keyboard(session, poll, user)
+            poll_text, vote_keyboard = get_poll_text_and_vote_keyboard(session, poll, None)
 
             # Ensure we have valid text
             if not poll_text or poll_text.strip() == "":

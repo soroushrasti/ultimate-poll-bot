@@ -4,7 +4,6 @@ from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
 from pollbot.display.misc import get_poll_list
-from pollbot.display.poll.compilation import get_poll_text_and_vote_keyboard
 from pollbot.i18n import i18n
 from pollbot.models import Poll
 from pollbot.models.user import User
@@ -39,28 +38,20 @@ async def handle_shared_poll(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             return
 
-        # Log poll sharing event
-        from pollbot.pollbot import log_poll_event
-        log_poll_event("Poll Shared", poll.id, user.id, f"Poll: {poll.name}")
+        # Retrieve poll options
+        options = session.query(pollbot.models.option.Option).filter_by(poll_id=poll.id).order_by(pollbot.models.option.Option.index).all()
+        option_names = [option.name for option in options]
 
-        # Show the poll to the user with voting options
-        text, keyboard = get_poll_text_and_vote_keyboard(session, poll, user)
-
-        # Ensure we have valid text to avoid "message text is empty" error
-        if not text or text.strip() == "":
-            text = f"📊 {poll.name}\n\n{i18n.t('poll.vote_prompt', locale=user.locale)}"
-
-        await update.message.reply_text(
-            text,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-            disable_web_page_preview=True
+        # Send the poll using send_poll
+        await context.bot.send_poll(
+            chat_id=update.effective_chat.id,
+            question=poll.name,
+            options=option_names,
+            is_anonymous=poll.anonymous,
+            allows_multiple_answers=(poll.poll_type == "multiple_vote"),
         )
-
-    except (ValueError, IndexError) as e:
-        await update.message.reply_text(
-            i18n.t("poll.invalid_link", locale=user.locale),
-        )
+    except Exception as e:
+        await update.message.reply_text(f"Error sharing poll: {str(e)}")
 
 
 @message_wrapper

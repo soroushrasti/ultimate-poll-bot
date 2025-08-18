@@ -163,7 +163,7 @@ def pick_due_date(
 
 
 @poll_required
-def set_next_month(_: scoped_session, context: CallbackContext, poll: Poll) -> str:
+async def set_next_month(_: scoped_session, context: CallbackContext, poll: Poll) -> str:
     """Show the datepicker keyboard for the next month."""
     this_month = date.fromisoformat(context.data[2])
     datepicker_context = DatepickerContext(int(context.data[3]))
@@ -176,7 +176,7 @@ def set_next_month(_: scoped_session, context: CallbackContext, poll: Poll) -> s
 
 
 @poll_required
-def set_previous_month(_: scoped_session, context: CallbackContext, poll: Poll) -> str:
+async def set_previous_month(_: scoped_session, context: CallbackContext, poll: Poll) -> str:
     """Show the datepicker keyboard for the previous month."""
     this_month = date.fromisoformat(context.data[2])
     datepicker_context = DatepickerContext(int(context.data[3]))

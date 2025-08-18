@@ -26,16 +26,26 @@ from pollbot.telegram.keyboard.settings import get_settings_keyboard
 @poll_required
 async def go_back(session: scoped_session, context: CallbackContext, poll: Poll) -> None:
     """Go back to the original step."""
-    if context.callback_result == CallbackResult.main_menu:
+    # Parse the callback result from the action field
+    try:
+        callback_result = CallbackResult(context.action)
+    except (ValueError, TypeError):
+        # Default to main menu if parsing fails
+        callback_result = CallbackResult.main_menu
+
+    if callback_result in [CallbackResult.main_menu, CallbackResult.back_to_main]:
         text = get_poll_text(session, poll)
         keyboard = get_management_keyboard(poll)
         poll.in_settings = False
 
-    elif context.callback_result == CallbackResult.settings:
+    elif callback_result == CallbackResult.settings:
         text = get_settings_text(poll)
         keyboard = get_settings_keyboard(poll)
     else:
-        raise Exception(f"Got unknown callback result {context.callback_result}")
+        # Default to main menu for unknown callback results
+        text = get_poll_text(session, poll)
+        keyboard = get_management_keyboard(poll)
+        poll.in_settings = False
 
     await context.query.message.edit_text(
         text,

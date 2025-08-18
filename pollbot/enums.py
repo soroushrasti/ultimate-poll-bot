@@ -201,6 +201,11 @@ class CallbackResult(Enum):
     true = 1
     false = 2
 
+    # Navigation results
+    main_menu = 10
+    settings = 11
+    back_to_main = 40  # Additional navigation result for back button
+
     # Poll voting
     vote = 20
     yes = 21
@@ -208,10 +213,6 @@ class CallbackResult(Enum):
     maybe = 23
     increase_priority = 24
     decrease_priority = 25
-
-    # Menu navigation
-    main_menu = 40
-    settings = 41
 
 
 @unique

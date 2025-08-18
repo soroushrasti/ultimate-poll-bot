@@ -5,6 +5,7 @@ from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.scoping import scoped_session
 
+from pollbot.db import get_session
 from pollbot.decorators import poll_required
 from pollbot.display.creation import get_datepicker_text
 from pollbot.enums import ExpectedInput, ReferenceType
@@ -19,8 +20,8 @@ from pollbot.telegram.keyboard.external import get_external_add_option_keyboard
 
 
 @poll_required
-def activate_notification(
-    session: scoped_session, context: CallbackContext, poll: Poll
+async def activate_notification(
+    _: scoped_session, context: CallbackContext, poll: Poll
 ) -> Optional[str]:
     """Show to vote type keyboard."""
     user = context.user
@@ -29,7 +30,8 @@ def activate_notification(
 
     message = context.query.message
     notification = (
-        session.query(Notification)
+        get_session()
+        .query(Notification)
         .filter(Notification.select_message_id == message.message_id)
         .one_or_none()
     )
@@ -38,7 +40,8 @@ def activate_notification(
         raise Exception(f"Got rogue notification board for poll {poll} and user {user}")
 
     existing_notification = (
-        session.query(Notification)
+        get_session()
+        .query(Notification)
         .filter(Notification.poll == poll)
         .filter(Notification.chat_id == message.chat_id)
         .one_or_none()
@@ -47,14 +50,14 @@ def activate_notification(
     # We already got a notification in this chat for this poll
     # Save the poll message id anyway
     if existing_notification is not None:
-        session.delete(notification)
+        get_session().delete(notification)
         existing_notification.poll_message_id = notification.poll_message_id
     else:
         notification.poll = poll
 
-    session.commit()
+    get_session().commit()
     message.edit_text(i18n.t("external.notification.activated", locale=poll.locale))
-    increase_stat(session, "notifications")
+    increase_stat(get_session(), "notifications")
 
 
 @poll_required
@@ -78,12 +81,12 @@ def open_external_datepicker(
 
 @poll_required
 def open_external_menu(
-    session: scoped_session, context: CallbackContext, poll: Poll
+    _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """This opens the option adding menu for non-admin users."""
     context.user.expected_input = ExpectedInput.new_user_option.name
     context.user.current_poll = poll
-    session.commit()
+    get_session().commit()
 
     context.query.message.edit_text(
         i18n.t("creation.option.first", locale=poll.locale),
@@ -94,19 +97,19 @@ def open_external_menu(
 
 @poll_required
 def external_cancel(
-    session: scoped_session, context: CallbackContext, poll: Poll
+    _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Closes the option adding menu for non-admin users."""
     context.user.expected_input = None
     context.user.current_poll = None
-    session.commit()
+    get_session().commit()
 
     context.query.message.edit_text(i18n.t("external.done", locale=poll.locale))
 
 
 @poll_required
 def update_shared(
-    session: scoped_session, context: CallbackContext, poll: Poll
+    _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Fallback button to update a poll that might not sync after sharing.
 
@@ -117,7 +120,8 @@ def update_shared(
     message_id = context.query.inline_message_id
 
     reference = (
-        session.query(Reference)
+        get_session()
+        .query(Reference)
         .filter(Reference.bot_inline_message_id == message_id)
         .filter(Reference.poll == poll)
         .one_or_none()
@@ -132,19 +136,19 @@ def update_shared(
                 ReferenceType.inline.name,
                 inline_message_id=message_id,
             )
-            session.add(reference)
-            session.commit()
+            get_session().add(reference)
+            get_session().commit()
         except IntegrityError:
             # Users can spam this button, which leads to UniqueConstraint errors.
             # Just ignore those.
-            session.rollback()
+            get_session().rollback()
 
-    try_update_reference(session, context.bot, poll, reference)
+    try_update_reference(get_session(), context.bot, poll, reference)
 
 
 @poll_required
 def copy_poll_link(
-    session: scoped_session, context: CallbackContext, poll: Poll
+    _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Send the poll link to the user for easy copying."""
     from pollbot.telegram.keyboard.helper import get_start_button_payload

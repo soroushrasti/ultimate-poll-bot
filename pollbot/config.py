@@ -7,7 +7,7 @@ import toml
 
 default_config = {
     "telegram": {
-        "bot_name": "poller",
+        "bot_name": "soroush_s_bot",
         "api_key": "7814140344:AAHVSofi8vgJpxE-ABACz98mIq5d1BPU4RQ",
         "worker_count": 20,
         "admin": "soroush",

@@ -58,7 +58,7 @@ def get_external_share_keyboard(poll: Poll) -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(
                 i18n.t("keyboard.share", locale=locale),
-                switch_inline_query=str(poll.id),  # Use just poll ID for inline query
+                switch_inline_query=f"share_{poll.id}",  # Use "share_" prefix for better handling
             )
         ],
         [
