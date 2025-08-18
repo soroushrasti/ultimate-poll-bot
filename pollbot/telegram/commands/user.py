@@ -1,6 +1,6 @@
+"""User related commands."""
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
-from telegram.update import Update
+from telegram import Bot, Update
 
 from pollbot.display.settings import get_user_settings_text
 from pollbot.i18n import i18n
@@ -12,7 +12,7 @@ from pollbot.telegram.keyboard.user import (
 from pollbot.telegram.session import message_wrapper
 
 
-@message_wrapper()
+@message_wrapper
 def open_user_settings_command(
     bot: Bot, update: Update, session: scoped_session, user: User
 ) -> None:
@@ -24,7 +24,7 @@ def open_user_settings_command(
     )
 
 
-@message_wrapper()
+@message_wrapper
 def stop(bot: Bot, update: Update, session: scoped_session, user: User) -> None:
     """Stop the user."""
     user.started = False
@@ -35,7 +35,7 @@ def stop(bot: Bot, update: Update, session: scoped_session, user: User) -> None:
     )
 
 
-@message_wrapper()
+@message_wrapper
 def delete_me(bot: Bot, update: Update, session: scoped_session, user: User) -> None:
     """Show the confirmation message before deleting the uesr."""
     update.message.chat.send_message(

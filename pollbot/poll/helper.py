@@ -1,6 +1,6 @@
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
-from telegram.error import BadRequest, Unauthorized
+from telegram import Bot
+from telegram.error import BadRequest, Forbidden
 
 from pollbot.enums import PollType
 from pollbot.i18n import i18n
@@ -58,7 +58,7 @@ def remove_old_references(
             bot.delete_message(
                 chat_id=reference.user_id, message_id=reference.message_id
             )
-        except Unauthorized:
+        except Forbidden:
             pass
         except BadRequest as e:
             if (

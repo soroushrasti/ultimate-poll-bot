@@ -47,13 +47,32 @@ def get_external_share_keyboard(poll: Poll) -> InlineKeyboardMarkup:
     """Allow external users to share a poll."""
     locale = poll.user.locale
 
+    # Create proper deep link for direct poll access
+    from pollbot.config import config
+
+    bot_username = config["telegram"]["bot_name"]
+    # Use poll ID for direct sharing instead of UUID
+    deep_link = f"https://t.me/{bot_username}?start=poll_{poll.id}"
+
     buttons = [
         [
             InlineKeyboardButton(
                 i18n.t("keyboard.share", locale=locale),
-                switch_inline_query=str(poll.uuid),
+                switch_inline_query=str(poll.id),  # Use just poll ID for inline query
             )
-        ]
+        ],
+        [
+            InlineKeyboardButton(
+                "🔗 Direct Vote Link",
+                url=deep_link,
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📋 Copy Poll Link",
+                callback_data=f"{CallbackType.copy_poll_link.value}:{poll.id}:0",
+            )
+        ],
     ]
     keyboard = InlineKeyboardMarkup(buttons)
 

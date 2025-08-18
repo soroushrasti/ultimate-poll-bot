@@ -2,9 +2,8 @@
 from typing import Optional
 
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
-from telegram.chat import Chat
-from telegram.update import Update
+from telegram import Bot, Update, Chat
+from telegram.ext import ContextTypes
 
 from pollbot.display import get_settings_text
 from pollbot.display.poll.option import next_option
@@ -17,235 +16,149 @@ from pollbot.models.user import User
 from pollbot.poll.helper import remove_old_references
 from pollbot.poll.option import add_options_multiline
 from pollbot.poll.update import update_poll_messages
-from pollbot.telegram.callback_handler.creation import create_poll
+from pollbot.poll.creation import create_poll
 from pollbot.telegram.keyboard.creation import (
     get_open_datepicker_keyboard,
     get_skip_description_keyboard,
+    get_options_entered_keyboard,
 )
 from pollbot.telegram.keyboard.settings import get_settings_keyboard
 from pollbot.telegram.session import message_wrapper
 
 
-@message_wrapper()
-def handle_private_text(
-    bot: Bot, update: Update, session: scoped_session, user: User
-) -> Optional[str]:
-    """Read all private messages and the creation of polls."""
-    text = update.message.text.strip()
-    poll = user.current_poll
-    chat = update.message.chat
-
-    if user.expected_input is None:
-        return
-
-    expected_input = ExpectedInput[user.expected_input]
-    ignored_expected_inputs = [
-        ExpectedInput.date,
-        ExpectedInput.due_date,
-        ExpectedInput.votes,
-    ]
-    # The user is currently not expecting input or no poll is set
-    if user.current_poll is None or user.expected_input is None:
-        return
-    elif expected_input in ignored_expected_inputs:
-        return
-    else:
-        actions = {
-            ExpectedInput.name: handle_set_name,
-            ExpectedInput.description: handle_set_description,
-            ExpectedInput.options: handle_create_options,
-            ExpectedInput.vote_count: handle_set_vote_count,
-            ExpectedInput.new_option: handle_new_option,
-            ExpectedInput.new_user_option: handle_user_option_addition,
-        }
-        for char in markdown_characters:
-            if char in text:
-                chat.send_message(
-                    i18n.t("creation.error.markdown", locale=user.locale),
-                    parse_mode="Markdown",
-                )
-                return
-
-        return actions[expected_input](bot, update, session, user, text, poll, chat)
-
-
-def handle_set_name(
-    bot: Bot,
-    update: Update,
-    session: scoped_session,
-    user: User,
-    text: str,
-    poll: Poll,
-    chat: Chat,
+@message_wrapper
+async def handle_private_text(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Set the name of the poll."""
-    poll.name = text
+    """Handle private text messages."""
+    session = context.session
+    user = context.user
 
-    if poll.name is None:
-        return i18n.t("creation.error.invalid_poll_name", locale=user.locale)
+    # Handle expected input based on user state
+    if user.expected_input == ExpectedInput.name.name:
+        await handle_poll_name_input(update, context)
+    elif user.expected_input == ExpectedInput.description.name:
+        await handle_poll_description_input(update, context)
+    elif user.expected_input == ExpectedInput.options.name:
+        await handle_poll_options_input(update, context)
+    elif user.expected_input == ExpectedInput.vote_count.name:
+        await handle_vote_count_input(update, context)
+    else:
+        # No expected input, send help message
+        await update.message.reply_text(
+            i18n.t("misc.unknown_command", locale=user.locale)
+        )
 
+
+async def handle_poll_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle poll name input during creation."""
+    session = context.session
+    user = context.user
+    text = update.message.text
+
+    if user.current_poll is None:
+        await update.message.reply_text(
+            i18n.t("creation.no_poll", locale=user.locale)
+        )
+        return
+
+    # Set poll name
+    user.current_poll.name = text
     user.expected_input = ExpectedInput.description.name
-    keyboard = get_skip_description_keyboard(poll)
-    chat.send_message(
+
+    # Ask for description
+    await update.message.reply_text(
         i18n.t("creation.description", locale=user.locale),
-        reply_markup=keyboard,
+        reply_markup=get_skip_description_keyboard(user.current_poll),
     )
 
 
-def handle_set_description(
-    bot: Bot,
-    update: Update,
-    session: scoped_session,
-    user: User,
-    text: str,
-    poll: Poll,
-    chat: Chat,
-) -> None:
-    """Set the description of the poll."""
-    poll.description = text
+async def handle_poll_description_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle poll description input during creation."""
+    session = context.session
+    user = context.user
+    text = update.message.text
 
-    if len(poll.options) == 0:
-        user.expected_input = ExpectedInput.options.name
-        chat.send_message(
-            i18n.t("creation.option.first", locale=user.locale),
-            reply_markup=get_open_datepicker_keyboard(poll),
-            parse_mode="markdown",
+    if user.current_poll is None:
+        await update.message.reply_text(
+            i18n.t("creation.no_poll", locale=user.locale)
         )
-    else:  # options were already prefilled e.g. by native poll
-        create_poll(session, poll, user, update.effective_chat)
+        return
+
+    # Set poll description
+    user.current_poll.description = text
+    user.expected_input = ExpectedInput.options.name
+
+    # Ask for first option
+    await update.message.reply_text(
+        i18n.t("creation.option.first", locale=user.locale),
+        reply_markup=get_open_datepicker_keyboard(user.current_poll),
+    )
 
 
-def handle_create_options(
-    bot: Bot,
-    update: Update,
-    session: scoped_session,
-    user: User,
-    text: str,
-    poll: Poll,
-    chat: Chat,
-) -> Optional[str]:
-    """Add options to the poll."""
-    # Multiple options can be sent at once separated by newline
-    # Strip them and ignore empty lines
-    added_options = add_options_multiline(session, poll, text)
+async def handle_poll_options_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle poll options input during creation."""
+    session = context.session
+    user = context.user
+    text = update.message.text
 
-    if len(added_options) == 0:
-        return i18n.t("creation.option.no_new", locale=user.locale)
-
-    next_option(chat, poll, added_options)
-
-
-def handle_set_vote_count(
-    bot: Bot,
-    update: Update,
-    session: scoped_session,
-    user: User,
-    text: str,
-    poll: Poll,
-    chat: Chat,
-) -> Optional[str]:
-    """Set the amount of possible votes for this poll."""
-    if poll.poll_type == PollType.limited_vote.name:
-        error_message = i18n.t(
-            "creation.error.limit_between", locale=user.locale, limit=len(poll.options)
+    if user.current_poll is None:
+        await update.message.reply_text(
+            i18n.t("creation.no_poll", locale=user.locale)
         )
-    elif poll.poll_type == PollType.cumulative_vote.name:
-        error_message = i18n.t("creation.error.limit_bigger_zero", locale=user.locale)
+        return
 
-    try:
-        amount = int(text)
-    except BaseException:
-        return error_message
-
-    # Check for valid count
-    if amount < 1 or (
-        poll.poll_type == PollType.limited_vote.name and amount > len(poll.options)
-    ):
-        return error_message
-
-    if amount > 2000000000:
-        return i18n.t("creation.error.too_big", locale=user.locale)
-
-    poll.number_of_votes = amount
-
-    create_poll(session, poll, user, chat)
-
-
-def handle_new_option(
-    bot: Bot,
-    update: Update,
-    session: scoped_session,
-    user: User,
-    text: str,
-    poll: Poll,
-    chat: Chat,
-) -> None:
-    """Add a new option after poll creation."""
-    added_options = add_options_multiline(session, poll, text)
-
-    if len(added_options) > 0:
-        text = i18n.t("creation.option.multiple_added", locale=user.locale) + "\n"
-        for option in added_options:
-            text += f"\n*{option}*"
-        chat.send_message(text, parse_mode="markdown")
-    else:
-        chat.send_message(i18n.t("creation.option.no_new", locale=user.locale))
-
-    # Reset expected input
-    user.current_poll = None
-    user.expected_input = None
-
-    text = get_settings_text(poll)
-    keyboard = get_settings_keyboard(poll)
-    message = chat.send_message(
-        text,
-        parse_mode="markdown",
-        reply_markup=keyboard,
-    )
-
-    remove_old_references(session, bot, poll, user)
-
-    # Create new reference
-    reference = Reference(
-        poll, ReferenceType.admin.name, user=user, message_id=message.message_id
-    )
-    session.add(reference)
+    # Add options (multiline support) and get the list of added options
+    added_options = add_options_multiline(session, user.current_poll, text)
     session.commit()
 
-    update_poll_messages(session, bot, poll, message.message_id, user)
+    # Set expected input for next option
+    user.expected_input = ExpectedInput.options.name
 
-
-def handle_user_option_addition(
-    bot: Bot,
-    update: Update,
-    session: scoped_session,
-    user: User,
-    text: str,
-    poll: Poll,
-    chat: Chat,
-) -> None:
-    """Handle the addition of options from and arbitrary user."""
-    if not poll.allow_new_options:
-        user.current_poll = None
-        user.expected_input = None
-        chat.send_message(i18n.t("creation.not_allowed", locale=user.locale))
-
-    added_options = add_options_multiline(session, poll, text)
-
-    if len(added_options) > 0:
-        # Reset user
-        user.current_poll = None
-        user.expected_input = None
-
-        session.commit()
-
-        # Send success message
-        text = i18n.t("creation.option.multiple_added", locale=user.locale) + "\n"
-        for option in added_options:
-            text += f"\n*{option}*"
-        chat.send_message(text, parse_mode="markdown")
-
-        # Update all polls
-        update_poll_messages(session, bot, poll)
+    # Send confirmation message manually since next_option() uses old API
+    if len(added_options) == 1:
+        await update.message.reply_text(
+            f"✅ Added option: *{added_options[0]}*\n\nSend another option or use the buttons below.",
+            parse_mode="Markdown",
+            reply_markup=get_options_entered_keyboard(user.current_poll)
+        )
+    elif len(added_options) > 1:
+        options_text = "\n".join([f"• *{opt}*" for opt in added_options])
+        await update.message.reply_text(
+            f"✅ Added {len(added_options)} options:\n{options_text}\n\nSend another option or use the buttons below.",
+            parse_mode="Markdown",
+            reply_markup=get_options_entered_keyboard(user.current_poll)
+        )
     else:
-        chat.send_message(i18n.t("creation.option.no_new", locale=user.locale))
+        await update.message.reply_text(
+            "⚠️ No valid options were added. Please try again."
+        )
+
+
+async def handle_vote_count_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle vote count input for limited/cumulative polls."""
+    session = context.session
+    user = context.user
+    text = update.message.text
+
+    if user.current_poll is None:
+        await update.message.reply_text(
+            i18n.t("creation.no_poll", locale=user.locale)
+        )
+        return
+
+    try:
+        vote_count = int(text)
+        if vote_count <= 0:
+            raise ValueError("Vote count must be positive")
+
+        user.current_poll.number_of_votes = vote_count
+        user.expected_input = None
+
+        # Create the poll
+        await create_poll(session, user.current_poll, user, update.message.chat, update.message)
+
+    except ValueError:
+        await update.message.reply_text(
+            i18n.t("creation.vote_count_invalid", locale=user.locale)
+        )

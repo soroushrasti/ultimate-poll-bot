@@ -140,3 +140,31 @@ def update_shared(
             session.rollback()
 
     try_update_reference(session, context.bot, poll, reference)
+
+
+@poll_required
+def copy_poll_link(
+    session: scoped_session, context: CallbackContext, poll: Poll
+) -> None:
+    """Send the poll link to the user for easy copying."""
+    from pollbot.telegram.keyboard.helper import get_start_button_payload
+    from pollbot.enums import StartAction
+    from pollbot.config import config
+
+    bot_username = config["telegram"]["bot_name"]
+    share_payload = get_start_button_payload(poll, StartAction.vote)
+    deep_link = f"https://t.me/{bot_username}?start={share_payload}"
+
+    message = f"🔗 **Poll Link:**\n`{deep_link}`\n\nShare this link with anyone to let them vote on your poll!"
+
+    context.query.answer(
+        "Link copied! You can now share this with others.",
+        show_alert=True,
+    )
+
+    # Also send the link as a message for easy copying
+    context.bot.send_message(
+        chat_id=context.user.id,
+        text=message,
+        parse_mode="markdown",
+    )

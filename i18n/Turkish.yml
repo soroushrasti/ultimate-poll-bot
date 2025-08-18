@@ -183,4 +183,4 @@ user:
 misc:
     help:
         management: "*Eski anketleri bul:*\n\nEski anketlerinizi bulmak ve yönetmek için /list ve /list\\_closed olarak iki komut var.\n\n\n*Anketleri sil:*\n\nBireysel anketleri ilgili anket menülerinden silebilirsiniz.\nAyrıca tüm kapalı anketleri silmek için /delete\\_closed komutu\nve tüm anketleri silmek için /delete\\_all komutu var.\n"
-        bugs: "*Gitmeyen bir hata var!!*\n\nGenellikle bir şey bozulur bozulmaz bir bildirim alırım, haberim olmayan bazı hatalar olabilir!\nHata bir veya iki gün içinde çözülmezse, lütfen [Github](https://github.com/Nukesor/ultimate-poll-bot)'tan bir konu açın.\n"
+        bugs: "*Gitmeyen bir hata var!!*\n\nGenellikle bir şey bozulur bozulmaz bir bildirim alırım, haberim olmayan bazı hatalar olabilir!\nHata bir veya iki gün içinde çözülmezse, lütfen [Github](https://github.com/)'tan bir konu açın.\n"

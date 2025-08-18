@@ -8,10 +8,10 @@ import toml
 default_config = {
     "telegram": {
         "bot_name": "poller",
-        "api_key": "",
+        "api_key": "7814140344:AAHVSofi8vgJpxE-ABACz98mIq5d1BPU4RQ",
         "worker_count": 20,
         "admin": "soroush",
-        "allow_private_vote": False,
+        "allow_private_vote": True,  # Changed from False to True
         "max_user_votes_per_day": 200,
         "max_inline_shares": 20,
         "max_polls_per_user": 200,

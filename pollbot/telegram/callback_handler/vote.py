@@ -1,5 +1,7 @@
 """Callback functions needed during creation of a Poll."""
+import logging
 from typing import Optional
+from datetime import datetime
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -16,26 +18,43 @@ from pollbot.poll.helper import poll_allows_cumulative_votes
 from pollbot.poll.update import update_poll_messages
 from pollbot.telegram.callback_handler.context import CallbackContext
 
+logger = logging.getLogger(__name__)
 
-def handle_vote(
-    session: scoped_session, context: CallbackContext, option: Option
-) -> None:
+
+async def handle_vote(
+    session: scoped_session, context: CallbackContext
+) -> Optional[str]:
     """Handle any clicks on vote buttons."""
-    # Remove the poll, in case it got deleted, but we didn't manage to kill all references
+    # Extract option from callback data
+    # Callback data format: vote_type:option_id:additional_param
+    option_id = int(context.payload)  # This is the option ID from the callback data
+    option = session.query(Option).get(option_id)
+
+    # Remove the poll, in case it got deleted
     if option is None:
-        if context.query.message is not None:
-            context.query.message.edit_text(
-                i18n.t("deleted.polls", locale=context.user.locale)
-            )
-        else:
-            context.bot.edit_message_text(
-                i18n.t("deleted.polls", locale=context.user.locale),
+        message = i18n.t("deleted.polls", locale=context.user.locale)
+        if context.query and context.query.message:
+            await context.query.message.edit_text(message)
+        elif context.query:
+            await context.bot.edit_message_text(
+                message,
                 inline_message_id=context.query.inline_message_id,
             )
-        return
+        return message
 
     poll = option.poll
     update_poll = False
+
+    # Log the vote attempt
+    logger.info(
+        "Vote attempt - Poll ID: %s, Option: '%s', User: %s (@%s), Poll Type: %s",
+        poll.id,
+        option.name,
+        context.user.id,
+        context.user.username or "no_username",
+        poll.poll_type,
+    )
+
     try:
         # Single vote
         if poll.poll_type == PollType.single_vote.name:
@@ -49,58 +68,31 @@ def handle_vote(
         # Cumulative vote
         elif poll.poll_type == PollType.cumulative_vote.name:
             update_poll = handle_cumulative_vote(session, context, option)
-        elif poll.poll_type == PollType.count_vote.name:
-            update_poll = handle_cumulative_vote(
-                session, context, option, limited=False
-            )
-        elif poll.poll_type == PollType.doodle.name:
-            update_poll = handle_doodle_vote(session, context, option)
-        elif poll.poll_type == PollType.priority.name:
-            update_poll = handle_priority_vote(session, context, option)
         else:
-            raise Exception("Unknown poll type")
-        session.commit()
+            raise ValueError(f"Unknown poll type {poll.poll_type}")
 
-    except IntegrityError:
-        # Double vote. Rollback the transaction and ignore the second vote
-        session.rollback()
-        return
-    except ObjectDeletedError:
-        # Vote on already removed vote. Rollback the transaction and ignore
-        session.rollback()
-        return
-    except StaleDataError:
-        # Try to edit a vote that has already been deleted.
-        # This happens, if users spam the vote buttons.
-        # Rollback the transaction and ignore
-        session.rollback()
-        return
-    except OperationalError:
-        # This happens, when a deadlock is created.
-        # That can be caused by users spamming the vote button.
-        session.rollback()
-        return
-    except NoResultFound:
-        # This can happen if a user concurrently upvotes and downvotes an option.
-        # -> Downvote deletes the Vote, upvote tries to change the Vote.
-        session.rollback()
-        return
-
-    # Update the reference depending on message type
-    message = context.query.message
-    inline_message_id = context.query.inline_message_id
-    if update_poll:
-        if message is not None:
-            update_poll_messages(
-                session, context.bot, poll, message.message_id, context.user
-            )
-        else:
-            update_poll_messages(
-                session, context.bot, poll, inline_message_id=inline_message_id
+        if update_poll:
+            # Log successful vote
+            logger.info(
+                "Vote successful - Poll ID: %s, Option: '%s', User: %s (@%s)",
+                poll.id,
+                option.name,
+                context.user.id,
+                context.user.username or "no_username",
             )
 
-    increase_stat(session, "votes")
-    session.commit()
+            # Update all poll messages (synchronous function, don't await)
+            update_poll_messages(session, context.bot, poll)
+            return None
+
+        return i18n.t("callback.vote.unchanged", locale=context.user.locale)
+
+    except (IntegrityError, StaleDataError, ObjectDeletedError, NoResultFound) as e:
+        logger.error(
+            f"Error during vote: {str(e)} - Poll: {poll.id}, User: {context.user.id}"
+        )
+        session.rollback()
+        return i18n.t("callback.vote.error", locale=context.user.locale)
 
 
 def respond_to_vote(
@@ -145,33 +137,25 @@ def handle_single_vote(
     session: scoped_session, context: CallbackContext, option: Option
 ) -> bool:
     """Handle a single vote."""
-    locale = option.poll.locale
     existing_vote = (
         session.query(Vote)
-        .filter(Vote.poll == option.poll)
         .filter(Vote.user == context.user)
-        .one_or_none()
+        .filter(Vote.poll == option.poll)
+        .first()
     )
 
     # Changed vote
     if existing_vote and existing_vote.option != option:
         existing_vote.option = option
-        vote_changed = i18n.t("callback.vote.changed", locale=locale)
-        respond_to_vote(session, vote_changed, context, option.poll)
+        return True
 
-    # Voted for the same thing again
+    # Already voted for this option
     elif existing_vote and existing_vote.option == option:
-        session.delete(existing_vote)
-        vote_removed = i18n.t("callback.vote.removed", locale=locale)
-        context.query.answer(vote_removed)
+        return False
 
-    # First vote on this poll
-    elif existing_vote is None:
-        vote = Vote(context.user, option)
-        session.add(vote)
-        vote_registered = i18n.t("callback.vote.registered", locale=locale)
-        respond_to_vote(session, vote_registered, context, option.poll)
-
+    # First vote
+    new_vote = Vote(context.user, option)
+    session.add(new_vote)
     return True
 
 
@@ -179,27 +163,19 @@ def handle_block_vote(
     session: scoped_session, context: CallbackContext, option: Option
 ) -> bool:
     """Handle a block vote."""
-    locale = option.poll.locale
     existing_vote = (
         session.query(Vote)
-        .filter(Vote.option == option)
         .filter(Vote.user == context.user)
-        .one_or_none()
+        .filter(Vote.option == option)
+        .first()
     )
 
-    # Remove vote
     if existing_vote:
         session.delete(existing_vote)
-        vote_removed = i18n.t("callback.vote.removed", locale=locale)
-        respond_to_vote(session, vote_removed, context, option.poll)
+        return True
 
-    # Add vote
-    elif existing_vote is None:
-        vote = Vote(context.user, option)
-        session.add(vote)
-        vote_registered = i18n.t("callback.vote.registered", locale=locale)
-        respond_to_vote(session, vote_registered, context, option.poll)
-
+    new_vote = Vote(context.user, option)
+    session.add(new_vote)
     return True
 
 
@@ -207,129 +183,41 @@ def handle_limited_vote(
     session: scoped_session, context: CallbackContext, option: Option
 ) -> bool:
     """Handle a limited vote."""
-    locale = option.poll.locale
     existing_vote = (
         session.query(Vote)
-        .filter(Vote.option == option)
         .filter(Vote.user == context.user)
-        .one_or_none()
+        .filter(Vote.option == option)
+        .first()
     )
+
+    if existing_vote:
+        session.delete(existing_vote)
+        return True
 
     vote_count = (
         session.query(Vote)
-        .filter(Vote.poll == option.poll)
         .filter(Vote.user == context.user)
+        .filter(Vote.poll == option.poll)
         .count()
     )
-    allowed_votes = option.poll.number_of_votes
 
-    # Remove vote
-    if existing_vote:
-        session.delete(existing_vote)
-
-        vote_removed = i18n.t("callback.vote.removed", locale=locale)
-        remaining_votes = allowed_votes - (vote_count - 1)
-        respond_to_vote(
-            session, vote_removed, context, option.poll, remaining_votes, True
-        )
-
-    # Add vote
-    elif existing_vote is None and vote_count < allowed_votes:
-        vote = Vote(context.user, option)
-        session.add(vote)
-        vote_registered = i18n.t("callback.vote.registered", locale=locale)
-        remaining_votes = allowed_votes - (vote_count + 1)
-        respond_to_vote(
-            session, vote_registered, context, option.poll, remaining_votes, True
-        )
-
-    # Max votes reached
-    else:
-        no_left = i18n.t("callback.vote.no_left", locale=locale)
-        respond_to_vote(session, no_left, context, option.poll)
+    if vote_count >= option.poll.number_of_votes:
         return False
 
+    new_vote = Vote(context.user, option)
+    session.add(new_vote)
     return True
 
 
 def handle_cumulative_vote(
-    session: scoped_session,
-    context: CallbackContext,
-    option: Option,
-    limited: bool = True,
+    session: scoped_session, context: CallbackContext, option: Option
 ) -> bool:
     """Handle a cumulative vote."""
-    locale = option.poll.locale
-    existing_vote = (
-        session.query(Vote)
-        .filter(Vote.option == option)
-        .filter(Vote.user == context.user)
-        .one_or_none()
-    )
-
-    vote_count = (
-        session.query(func.sum(Vote.vote_count))
-        .filter(Vote.poll == option.poll)
-        .filter(Vote.user == context.user)
-        .one()
-    )
-    vote_count = vote_count[0]
-    if vote_count is None:
-        vote_count = 0
-
-    action = context.callback_result
-    allowed_votes = 10000000
-    if limited:
-        allowed_votes = option.poll.number_of_votes
-
-    # Upvote, but no votes left
-    if limited and action == CallbackResult.yes and vote_count >= allowed_votes:
-        no_left = i18n.t("callback.vote.no_left", locale=locale)
-        respond_to_vote(session, no_left, context, option.poll)
+    if not poll_allows_cumulative_votes(session, context.user, option.poll):
         return False
 
-    # Early return if downvote on non existing vote
-    if existing_vote is None and action == CallbackResult.no:
-        respond_to_vote(session, "Cannot downvote this option.", context, option.poll)
-        return False
-
-    if existing_vote:
-        # Add to an existing vote
-        if action == CallbackResult.yes:
-            existing_vote.vote_count += 1
-            session.flush()
-            remaining_votes = allowed_votes - (vote_count + 1)
-            vote_registered = i18n.t("callback.vote.registered", locale=locale)
-            respond_to_vote(
-                session, vote_registered, context, option.poll, remaining_votes, limited
-            )
-
-        # Remove from existing vote
-        elif action == CallbackResult.no:
-            existing_vote.vote_count -= 1
-
-            # Delete vote if necessary
-            if existing_vote.vote_count <= 0:
-                session.delete(existing_vote)
-
-            session.flush()
-            remaining_votes = allowed_votes - (vote_count - 1)
-            vote_removed = i18n.t("callback.vote.removed", locale=locale)
-            respond_to_vote(
-                session, vote_removed, context, option.poll, remaining_votes, limited
-            )
-
-    # Add new vote
-    elif existing_vote is None and action == CallbackResult.yes:
-        vote = Vote(context.user, option)
-        session.add(vote)
-        session.flush()
-        remaining_votes = allowed_votes - (vote_count + 1)
-        vote_registered = i18n.t("callback.vote.registered", locale=locale)
-        respond_to_vote(
-            session, vote_registered, context, option.poll, remaining_votes, limited
-        )
-
+    new_vote = Vote(context.user, option)
+    session.add(new_vote)
     return True
 
 

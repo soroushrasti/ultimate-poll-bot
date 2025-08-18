@@ -3,7 +3,7 @@ import math
 from typing import Any, Union
 
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.chat import Chat
+from telegram import Chat
 
 from pollbot.display.poll import Context
 from pollbot.display.poll.indices import get_option_indices

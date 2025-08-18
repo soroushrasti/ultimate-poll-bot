@@ -6,8 +6,8 @@ from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
-from telegram.error import BadRequest, RetryAfter, TimedOut, Unauthorized
+from telegram import Bot
+from telegram.error import BadRequest, RetryAfter, TimedOut, Forbidden
 
 from pollbot.display.poll.compilation import get_poll_text_and_vote_keyboard
 from pollbot.enums import ExpectedInput, ReferenceType
@@ -219,7 +219,7 @@ def update_reference(
         else:
             raise e
 
-    except Unauthorized:
+    except Forbidden:
         session.delete(reference)
         session.flush()
     except TimedOut:

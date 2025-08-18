@@ -2,7 +2,7 @@
 from typing import Union
 
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
+from telegram import InlineKeyboardMarkup
 
 from pollbot.i18n import i18n
 from pollbot.models import Poll

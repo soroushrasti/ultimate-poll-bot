@@ -134,6 +134,7 @@ class CallbackType(Enum):
     external_open_datepicker = 102
     external_open_menu = 103
     external_cancel = 104
+    copy_poll_link = 105  # New callback type for copying poll links
 
     show_option_name = 110
 

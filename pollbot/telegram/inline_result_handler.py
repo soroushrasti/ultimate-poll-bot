@@ -1,51 +1,51 @@
 """Handle inline query results."""
-from psycopg2.errors import UniqueViolation
-from sqlalchemy.exc import DataError, IntegrityError
-from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
-from telegram.update import Update
+import logging
+from telegram import Update
+from telegram.ext import CallbackContext
 
 from pollbot.enums import ReferenceType
 from pollbot.helper.stats import increase_user_stat
-from pollbot.models import Poll, Reference, User
+from pollbot.models import Poll, Reference
 from pollbot.poll.update import try_update_reference
-from pollbot.telegram.session import inline_result_wrapper
+from pollbot.telegram.session import inline_query_wrapper
+
+logger = logging.getLogger(__name__)
 
 
-@inline_result_wrapper
-def handle_chosen_inline_result(
-    bot: Bot, update: Update, session: scoped_session, user: User
-) -> None:
-    """Save the chosen inline result."""
+@inline_query_wrapper
+async def handle_chosen_inline_result(update: Update, context: CallbackContext) -> None:
+    """Save the chosen inline result and handle poll sharing."""
+    session = context.session
+    user = context.user
     result = update.chosen_inline_result
     poll_id = result.result_id
 
+    # Try to get the poll and create a reference
+    poll = session.query(Poll).get(poll_id)
+    if poll is None:
+        logger.warning(f"Poll {poll_id} doesn't exist (Inline chosen result)")
+        return
+
+    # Create a reference
+    reference = Reference(
+        poll,
+        ReferenceType.inline.name,
+        result.inline_message_id,
+    )
+    session.add(reference)
+    session.commit()
+
+    # Increase the inline shares counter
+    increase_user_stat(session, poll.user, "inline_shares")
+    session.commit()
+
+    # Try to update the reference
     try:
-        poll = session.query(Poll).get(poll_id)
+        await try_update_reference(session, context.bot, reference)
+    except Exception as e:
+        logger.error(f"Error while updating reference: {str(e)}")
 
-    except DataError:
-        # Possile if the poll has been shared too often and
-        # the inline result is picked despite saying otherwise.
-        return
-
-    if result.inline_message_id is None:
-        return
-
-    try:
-        reference = Reference(
-            poll,
-            ReferenceType.inline.name,
-            inline_message_id=result.inline_message_id,
-        )
-        session.add(reference)
-        session.commit()
-    except (UniqueViolation, IntegrityError):
-        # I don't know how this can happen, but it happens.
-        # It seems that user can spam click inline query results, which then leads
-        # to multiple chosen_inline_result queries being sent to the bot.
-        session.rollback()
-        return
-
-    try_update_reference(session, bot, poll, reference, first_try=True)
-
-    increase_user_stat(session, user, "inline_shares")
+    # Log the sharing event
+    logger.info(
+        f"Poll shared - Poll ID: {poll_id}, User: {user.id} (@{user.username or 'no_username'}), Type: inline"
+    )

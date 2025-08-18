@@ -28,9 +28,9 @@ from pollbot.telegram.keyboard.settings import (
 from pollbot.telegram.keyboard.styling import get_styling_settings_keyboard
 
 
-def send_settings_message(context: CallbackContext) -> None:
+async def send_settings_message(context: CallbackContext) -> None:
     """Edit the message of the current context to the settings menu."""
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text=get_settings_text(context.poll),
         parse_mode="markdown",
         reply_markup=get_settings_keyboard(context.poll),
@@ -39,11 +39,11 @@ def send_settings_message(context: CallbackContext) -> None:
 
 
 @poll_required
-def show_anonymization_confirmation(
+async def show_anonymization_confirmation(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Show the delete confirmation message."""
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("settings.anonymize", locale=poll.user.locale),
         reply_markup=get_anonymization_confirmation_keyboard(poll),
     )
@@ -168,7 +168,7 @@ def remove_option(
 
 
 @poll_required
-def toggle_allow_new_options(
+async def toggle_allow_new_options(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Toggle the visibility of the percentage bar."""
@@ -176,11 +176,11 @@ def toggle_allow_new_options(
 
     session.commit()
     update_poll_messages(session, context.bot, poll)
-    send_settings_message(context)
+    await send_settings_message(context)
 
 
 @poll_required
-def toggle_allow_sharing(
+async def toggle_allow_sharing(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Toggle the visibility of the percentage bar."""
@@ -188,4 +188,4 @@ def toggle_allow_sharing(
 
     session.commit()
     update_poll_messages(session, context.bot, poll)
-    send_settings_message(context)
+    await send_settings_message(context)

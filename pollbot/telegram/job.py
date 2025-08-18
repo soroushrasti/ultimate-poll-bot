@@ -5,8 +5,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import aliased, joinedload
 from sqlalchemy.orm.exc import ObjectDeletedError, StaleDataError
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.error import BadRequest, RetryAfter, Unauthorized
-from telegram.ext.callbackcontext import CallbackContext
+from telegram.error import BadRequest, RetryAfter, Forbidden
+from telegram.ext import ContextTypes
 
 from pollbot.config import config
 from pollbot.enums import PollDeletionMode
@@ -19,7 +19,7 @@ from pollbot.telegram.session import job_wrapper
 
 
 @job_wrapper
-def message_update_job(context: CallbackContext, session: scoped_session) -> None:
+async def message_update_job(context: ContextTypes.DEFAULT_TYPE, session: scoped_session) -> None:
     """Update all polls that are scheduled for an update."""
     try:
         context.job.enabled = False
@@ -69,7 +69,7 @@ def message_update_job(context: CallbackContext, session: scoped_session) -> Non
 
 
 @job_wrapper
-def delete_polls(context: CallbackContext, session: scoped_session) -> None:
+def delete_polls(context: ContextTypes, session: scoped_session) -> None:
     """Delete polls from the database and their messages if requested."""
     try:
         context.job.enabled = False
@@ -97,7 +97,7 @@ def delete_polls(context: CallbackContext, session: scoped_session) -> None:
 
 
 @job_wrapper
-def send_notifications(context: CallbackContext, session: scoped_session) -> None:
+def send_notifications(context: ContextTypes, session: scoped_session) -> None:
     """Notify the users about the poll being closed soon."""
     polls = (
         session.query(Poll)
@@ -142,7 +142,7 @@ def send_notifications(context: CallbackContext, session: scoped_session) -> Non
 
 
 def send_notifications_for_poll(
-    context: CallbackContext, session: scoped_session, poll: Poll, message_key: str
+    context: ContextTypes, session: scoped_session, poll: Poll, message_key: str
 ) -> None:
     """Send the notifications for a single poll depending on the remaining time."""
     locale = poll.locale
@@ -161,7 +161,7 @@ def send_notifications_for_poll(
                 session.delete(notification)
 
         # Bot was removed from group
-        except Unauthorized:
+        except Forbidden:
             session.delete(notification)
 
         except Exception as e:
@@ -169,7 +169,7 @@ def send_notifications_for_poll(
 
 
 @job_wrapper
-def create_daily_stats(context: CallbackContext, session: scoped_session) -> None:
+def create_daily_stats(context: ContextTypes, session: scoped_session) -> None:
     """Create the daily stats entity for today and tomorrow."""
     try:
         today = date.today()
@@ -187,7 +187,7 @@ def create_daily_stats(context: CallbackContext, session: scoped_session) -> Non
 
 
 @job_wrapper
-def perma_ban_checker(context: CallbackContext, session: scoped_session) -> None:
+def perma_ban_checker(context: ContextTypes, session: scoped_session) -> None:
     """Perma-ban people that send more than 250 votes for at least 3 days in the last week."""
     vote_limit = config["telegram"]["max_user_votes_per_day"]
     stats = (
@@ -214,7 +214,7 @@ def perma_ban_checker(context: CallbackContext, session: scoped_session) -> None
 
 
 @job_wrapper
-def cleanup(context: CallbackContext, session: scoped_session) -> None:
+def cleanup(context: ContextTypes, session: scoped_session) -> None:
     """Run various database cleanup operations."""
     user_statistics_cleanup(context, session)
     old_closed_poll_cleanup(context, session)
@@ -222,13 +222,13 @@ def cleanup(context: CallbackContext, session: scoped_session) -> None:
     unfinished_polls_cleanup(context, session)
 
 
-def user_statistics_cleanup(context: CallbackContext, session: scoped_session) -> None:
+def user_statistics_cleanup(context: ContextTypes, session: scoped_session) -> None:
     """Remove all user statistics after 7 days."""
     threshold = date.today() - timedelta(days=7)
     session.query(UserStatistic).filter(UserStatistic.date < threshold).delete()
 
 
-def old_closed_poll_cleanup(context: CallbackContext, session: scoped_session) -> None:
+def old_closed_poll_cleanup(context: ContextTypes, session: scoped_session) -> None:
     """Remove old closed polls."""
     last_update_threshold = date.today() - timedelta(days=180)
 
@@ -259,7 +259,7 @@ def old_closed_poll_cleanup(context: CallbackContext, session: scoped_session) -
     session.commit()
 
 
-def old_open_poll_cleanup(context: CallbackContext, session: scoped_session) -> None:
+def old_open_poll_cleanup(context: ContextTypes, session: scoped_session) -> None:
     """Remove old open polls that haven't been touched for for a long time."""
     last_update_threshold = date.today() - timedelta(days=360)
 
@@ -290,7 +290,7 @@ def old_open_poll_cleanup(context: CallbackContext, session: scoped_session) -> 
     session.commit()
 
 
-def unfinished_polls_cleanup(context: CallbackContext, session: scoped_session) -> None:
+def unfinished_polls_cleanup(context: ContextTypes, session: scoped_session) -> None:
     """Remove unfinished polls that haven't been touched for some time."""
     last_update_threshold = date.today() - timedelta(days=30)
 

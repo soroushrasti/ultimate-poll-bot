@@ -1,8 +1,7 @@
 """The start command handler."""
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
+from telegram import Bot, Update
 from telegram.error import BadRequest
-from telegram.update import Update
 
 from pollbot.i18n import i18n
 from pollbot.models import Notification, Poll
@@ -11,7 +10,7 @@ from pollbot.telegram.keyboard.external import get_notify_keyboard
 from pollbot.telegram.session import message_wrapper
 
 
-@message_wrapper()
+@message_wrapper
 def notify(bot: Bot, update: Update, session: scoped_session, user: User) -> None:
     """Activate notifications for polls with due date."""
     polls = (

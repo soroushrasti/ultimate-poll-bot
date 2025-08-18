@@ -2,8 +2,8 @@ from time import sleep
 
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.error import BadRequest, RetryAfter, Unauthorized
-from telegram.ext.callbackcontext import CallbackContext
+from telegram.error import BadRequest, RetryAfter, Forbidden
+from telegram.ext import ContextTypes
 
 from pollbot.enums import ReferenceType
 from pollbot.i18n import i18n
@@ -15,7 +15,7 @@ from pollbot.telegram.session import should_report_exception
 
 def delete_poll(
     session: scoped_session,
-    context: CallbackContext,
+    context: ContextTypes,
     poll: Poll,
     remove_all: bool = False,
 ) -> None:
@@ -101,7 +101,7 @@ def delete_poll(
                 if should_report_exception(context, e):
                     sentry.capture_exception(tags={"handler": "job"})
                 return
-        except Unauthorized:
+        except Forbidden:
             pass
         except ObjectDeletedError:
             # This reference has already been deleted somewhere else. Just ignore this.

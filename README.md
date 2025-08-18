@@ -140,13 +140,13 @@ Dependencies:
 - [Poetry](https://python-poetry.org/) to manage and install dependencies.
 - [Just](https://github.com/casey/just) for convience.
 - Ultimate Pollbot uses Postgres. Make sure the user has write/read rights. You can use [the provided docker-compose
- file](https://github.com/Nukesor/ultimate-poll-bot/blob/main/docker/docker-compose.yml) to set up a local development
+ file](https://github.com//blob/main/docker/docker-compose.yml) to set up a local development
   environment.
 
 1. Clone the repository:
 
 ```bash
-git clone git@github.com:nukesor/ultimate-poll-bot pollbot && cd pollbot
+git clone git@github.com: pollbot && cd pollbot
 ```
 
 1. Execute `just setup` to install all dependencies.

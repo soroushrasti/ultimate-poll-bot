@@ -24,7 +24,7 @@ from pollbot.telegram.keyboard.settings import get_settings_keyboard
 
 
 @poll_required
-def go_back(session: scoped_session, context: CallbackContext, poll: Poll) -> None:
+async def go_back(session: scoped_session, context: CallbackContext, poll: Poll) -> None:
     """Go back to the original step."""
     if context.callback_result == CallbackResult.main_menu:
         text = get_poll_text(session, poll)
@@ -37,7 +37,7 @@ def go_back(session: scoped_session, context: CallbackContext, poll: Poll) -> No
     else:
         raise Exception(f"Got unknown callback result {context.callback_result}")
 
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text,
         parse_mode="markdown",
         reply_markup=keyboard,
@@ -49,7 +49,7 @@ def go_back(session: scoped_session, context: CallbackContext, poll: Poll) -> No
 
 
 @poll_required
-def show_vote_menu(
+async def show_vote_menu(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Show the vote keyboard in the management interface."""
@@ -62,7 +62,7 @@ def show_vote_menu(
     )
     # Set the expected_input to votes, since the user might want to vote multiple times
     context.user.expected_input = ExpectedInput.votes.name
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text,
         parse_mode="markdown",
         reply_markup=keyboard,
@@ -71,11 +71,11 @@ def show_vote_menu(
 
 
 @poll_required
-def show_settings(_: scoped_session, context: CallbackContext, poll: Poll) -> None:
+async def show_settings(_: scoped_session, context: CallbackContext, poll: Poll) -> None:
     """Show the settings tab."""
     text = get_settings_text(poll)
     keyboard = get_settings_keyboard(poll)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text,
         parse_mode="markdown",
         reply_markup=keyboard,
@@ -85,32 +85,32 @@ def show_settings(_: scoped_session, context: CallbackContext, poll: Poll) -> No
 
 
 @poll_required
-def show_deletion_confirmation(
+async def show_deletion_confirmation(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Show the delete confirmation message."""
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("management.delete", locale=poll.user.locale),
         reply_markup=get_deletion_confirmation(poll),
     )
 
 
 @poll_required
-def show_close_confirmation(
+async def show_close_confirmation(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Show the permanent close confirmation message."""
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("management.permanently_close", locale=poll.user.locale),
         reply_markup=get_close_confirmation(poll),
     )
 
 
 @poll_required
-def show_menu(session: scoped_session, context: CallbackContext, poll: Poll) -> None:
+async def show_menu(session: scoped_session, context: CallbackContext, poll: Poll) -> None:
     """Replace the current message with the main poll menu."""
     message = context.query.message
-    message.edit_text(
+    await message.edit_text(
         get_poll_text(session, poll),
         parse_mode="markdown",
         reply_markup=get_management_keyboard(poll),

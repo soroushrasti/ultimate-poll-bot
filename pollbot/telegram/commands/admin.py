@@ -2,27 +2,27 @@
 import time
 from datetime import datetime, timedelta
 
+from matplotlib import pyplot as plt
 from sqlalchemy.orm.scoping import scoped_session
-from telegram import ReplyKeyboardRemove
-from telegram.bot import Bot
-from telegram.error import BadRequest, Unauthorized
-from telegram.update import Update
+from telegram import Bot, Update, ReplyKeyboardRemove
+from telegram.error import BadRequest, Forbidden
+from telegram.ext import ContextTypes
 
 from pollbot.decorators import admin_required
 from pollbot.models import User
 from pollbot.telegram.session import message_wrapper
 
-
-@message_wrapper()
 @admin_required
-def reset_broadcast(
-    bot: Bot, update: Update, session: scoped_session, user: User
+@message_wrapper
+async def reset_broadcast(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> str:
     """Reset the broadcast_sent flag for all users."""
+    session = context.session
     session.query(User).update({"broadcast_sent": False})
     session.commit()
 
-    return "All broadcast flags resetted"
+    await update.message.reply_text("All broadcast flags resetted")
 
 
 def remaining_time(total, current, start):
@@ -33,11 +33,11 @@ def remaining_time(total, current, start):
     remaining_time = ((total - current) / total) * total_time
     return timedelta(seconds=int(remaining_time))
 
-
-@message_wrapper()
 @admin_required
-def broadcast(bot: Bot, update: Update, session: scoped_session, user: User) -> None:
+@message_wrapper
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Broadcast a message to all users."""
+    session = context.session
     chat = update.message.chat
     message = update.message.text.split(" ", 1)[1].strip()
     user_count = (
@@ -50,7 +50,7 @@ def broadcast(bot: Bot, update: Update, session: scoped_session, user: User) -> 
     )
 
     start_time = datetime.now()
-    chat.send_message(f"Sending broadcast to {user_count} chats.")
+    await chat.send_message(f"Sending broadcast to {user_count} chats.")
 
     sent_count = 0
     batch_size = 1000
@@ -82,7 +82,7 @@ def broadcast(bot: Bot, update: Update, session: scoped_session, user: User) -> 
                     user.started = False
 
             # We are not allowed to contact this user.
-            except Unauthorized:
+            except Forbidden:
                 user.started = False
 
             except TimeoutError:
@@ -105,18 +105,8 @@ def broadcast(bot: Bot, update: Update, session: scoped_session, user: User) -> 
 
     update.message.chat.send_message("All messages sent")
 
-
-@message_wrapper()
 @admin_required
-def test_broadcast(
-    bot: Bot, update: Update, session: scoped_session, user: User
-) -> None:
-    """Send the broadcast message to the admin for test purposes."""
-    message = update.message.text.split(" ", 1)[1].strip()
-
-    bot.send_message(
-        user.id,
-        message,
-        parse_mode="Markdown",
-        reply_markup=ReplyKeyboardRemove(),
-    )
+@message_wrapper
+async def test_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Test broadcast functionality."""
+    await update.message.reply_text("Test broadcast message sent successfully!")

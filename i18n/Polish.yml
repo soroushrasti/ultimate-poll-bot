@@ -154,4 +154,4 @@ delete:
 user:
     language_changed: 'Zmieniono język'
 misc:
-    error: "Wystąpił niespodziewany błąd. Prawdopodobnie dostałem już o tym powiadomienie i spróbuję to naprawić najszybciej jak to możliwe.\nW przypadku gdy błąd nie został naprawiony w przeciągu 2 lub 3 dni, dodaj problem na [Github](https://github.com/Nukesor/ultimate-poll-bot)."
+    error: "Wystąpił niespodziewany błąd. Prawdopodobnie dostałem już o tym powiadomienie i spróbuję to naprawić najszybciej jak to możliwe.\nW przypadku gdy błąd nie został naprawiony w przeciągu 2 lub 3 dni, dodaj problem na [Github](https://github.com/)."

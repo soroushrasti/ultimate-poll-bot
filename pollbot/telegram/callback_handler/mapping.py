@@ -27,6 +27,7 @@ from .datepicker import (
 )
 from .external import (
     activate_notification,
+    copy_poll_link,
     external_cancel,
     open_external_datepicker,
     open_external_menu,
@@ -200,6 +201,7 @@ async_callback_mapping = {
     CallbackType.external_open_datepicker: open_external_datepicker,
     CallbackType.external_open_menu: open_external_menu,
     CallbackType.external_cancel: external_cancel,
+    CallbackType.copy_poll_link: copy_poll_link,
     # Misc
     CallbackType.switch_help: switch_help,
     CallbackType.show_option_name: show_option_name,
@@ -215,7 +217,11 @@ def get_callback_mapping_regex():
         if regex != "":
             regex += "|"
 
-        regex += f"^{key.value}:.*"
+        # Handle both enum and string keys
+        if hasattr(key, 'value'):
+            regex += f"^{key.value}:.*"
+        else:
+            regex += f"^{key}:.*"
 
     return regex
 
@@ -227,6 +233,10 @@ def get_async_callback_mapping_regex():
         if regex != "":
             regex += "|"
 
-        regex += f"^{key.value}:.*"
+        # Handle both enum and string keys
+        if hasattr(key, 'value'):
+            regex += f"^{key.value}:.*"
+        else:
+            regex += f"^{key}:.*"
 
     return regex

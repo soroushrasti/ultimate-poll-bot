@@ -3,7 +3,8 @@ from datetime import date
 from typing import Optional
 
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.message import Message
+from telegram import Update, Message
+from telegram.ext import ContextTypes, CallbackContext
 
 from pollbot.decorators import poll_required
 from pollbot.display.creation import (
@@ -18,7 +19,6 @@ from pollbot.exceptions import RollbackException
 from pollbot.i18n import i18n
 from pollbot.models import Poll
 from pollbot.poll.creation import create_poll
-from pollbot.telegram.callback_handler.context import CallbackContext
 from pollbot.telegram.keyboard.creation import (
     get_change_poll_type_keyboard,
     get_init_keyboard,
@@ -147,7 +147,7 @@ def toggle_results_visible(session, context, poll):
 
 
 @poll_required
-def all_options_entered(session, context, poll):
+async def all_options_entered(session, context, poll):
     """All options are entered the poll is created."""
     if poll is None or poll.created:
         return
@@ -155,13 +155,13 @@ def all_options_entered(session, context, poll):
     locale = context.user.locale
     if poll.poll_type in [PollType.limited_vote.name, PollType.cumulative_vote.name]:
         message = context.query.message
-        message.edit_text(i18n.t("creation.option.finished", locale=locale))
+        await message.edit_text(i18n.t("creation.option.finished", locale=locale))
         context.user.expected_input = ExpectedInput.vote_count.name
-        message.chat.send_message(i18n.t("creation.vote_count_request", locale=locale))
-
+        await message.chat.send_message(i18n.t("creation.vote_count_request", locale=locale))
         return
 
-    create_poll(
+    # Create the poll
+    await create_poll(
         session, poll, context.user, context.query.message.chat, context.query.message
     )
 
@@ -210,15 +210,15 @@ def close_creation_datepicker(session, context, poll):
     message.edit_text(text, parse_mode="markdown", reply_markup=keyboard)
 
 
-def cancel_creation(session: scoped_session, context: CallbackContext) -> Optional[str]:
+async def cancel_creation(session: scoped_session, context: CallbackContext) -> Optional[str]:
     """Cancel the creation of a poll."""
     if context.poll is None:
         return i18n.t("delete.doesnt_exist", locale=context.user.locale)
 
     session.delete(context.poll)
     session.commit()
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("delete.previous_deleted", locale=context.user.locale)
     )
 
-    init_poll(session, context)
+    await init_poll(session, context)

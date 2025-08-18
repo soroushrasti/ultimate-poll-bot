@@ -84,12 +84,12 @@ def open_help(_: scoped_session, context: CallbackContext) -> None:
     )
 
 
-def init_poll(session: scoped_session, context: CallbackContext) -> None:
+async def init_poll(session: scoped_session, context: CallbackContext) -> None:
     """Start the creation of a new poll."""
     user = context.user
     chat = context.query.message.chat
 
-    initialize_poll(session, user, chat)
+    await initialize_poll(session, user, chat)
 
 
 def toggle_notification(session: scoped_session, context: CallbackContext) -> None:

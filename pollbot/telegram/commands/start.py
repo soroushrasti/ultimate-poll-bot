@@ -1,11 +1,12 @@
 """The start command handler."""
+import logging
 import time
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm.scoping import scoped_session
-from telegram.bot import Bot
-from telegram.update import Update
+from telegram import Bot, Update
+from telegram.ext import ContextTypes
 
 from pollbot.config import config
 from pollbot.display.poll.compilation import (
@@ -26,113 +27,59 @@ from pollbot.telegram.keyboard.external import (
 from pollbot.telegram.keyboard.user import get_main_keyboard
 from pollbot.telegram.session import message_wrapper
 
+logger = logging.getLogger(__name__)
 
-@message_wrapper()
-def start(bot: Bot, update: Update, session: scoped_session, user: User) -> Optional[str]:
+
+@message_wrapper
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a start text."""
+    session = context.session
+    user = context.user
+
     # Truncate the /start command
     text = update.message.text[6:].strip()
     user.started = True
 
-    poll = None
-    action = None
-    try:
-        poll_uuid = UUID(text.split("-")[0])
-        action = StartAction(int(text.split("-")[1]))
+    # Handle poll sharing via deep links
+    if text.startswith("poll_"):
+        try:
+            poll_id = int(text.split("_")[1])
+            poll = session.query(Poll).get(poll_id)
 
-        poll = session.query(Poll).filter(Poll.uuid == poll_uuid).one()
-    except:  # noqa E722
-        text = ""
-
-    # We got an empty text, just send the start message
-    if text == "":
-        update.message.chat.send_message(
-            i18n.t("misc.start", locale=user.locale),
-            parse_mode="markdown",
-            reply_markup=get_main_keyboard(user),
-            disable_web_page_preview=True,
-        )
-
-        return
-
-    if poll is None:
-        return "This poll no longer exists."
-
-    if action == StartAction.new_option and poll.allow_new_options:
-        # Update the expected input and set the current poll
-        user.expected_input = ExpectedInput.new_user_option.name
-        user.current_poll = poll
-        session.commit()
-
-        update.message.chat.send_message(
-            i18n.t("creation.option.first", locale=poll.locale),
-            parse_mode="markdown",
-            reply_markup=get_external_add_option_keyboard(poll),
-        )
-    elif action == StartAction.show_results:
-        # Get all lines of the poll
-        lines = compile_poll_text(session, poll)
-        # Now split the text into chunks of max 4000 characters
-        chunks = split_text(lines)
-
-        for chunk in chunks:
-            message = "\n".join(chunk)
-            try:
-                update.message.chat.send_message(
-                    message,
-                    parse_mode="markdown",
-                    disable_web_page_preview=True,
+            if poll is None:
+                await update.message.reply_text(
+                    i18n.t("poll.not_found", locale=user.locale),
                 )
-            # Retry for Timeout error (happens quite often when sending large messages)
-            except TimeoutError:
-                time.sleep(2)
-                update.message.chat.send_message(
-                    message,
-                    parse_mode="markdown",
-                    disable_web_page_preview=True,
-                )
-            time.sleep(1)
+                return
 
-        update.message.chat.send_message(
-            i18n.t("misc.start_after_results", locale=poll.locale),
-            parse_mode="markdown",
-            reply_markup=get_main_keyboard(user),
-        )
-        increase_stat(session, "show_results")
+            # Log poll access
+            logger.info(f"Poll accessed via deep link - Poll ID: {poll.id}, User: {user.id}")
 
-    elif action == StartAction.share_poll and poll.allow_sharing:
-        update.message.chat.send_message(
-            i18n.t("external.share_poll", locale=poll.locale),
-            reply_markup=get_external_share_keyboard(poll),
-        )
-        increase_stat(session, "externally_shared")
+            # Show the poll to the user with voting options
+            text, keyboard = get_poll_text_and_vote_keyboard(session, poll, user)
 
-    elif action == StartAction.vote:
-        if not config["telegram"]["allow_private_vote"] and not poll.is_priority():
+            # Ensure we have valid text to avoid "message text is empty" error
+            if not text or text.strip() == "":
+                text = f"📊 {poll.name}\n\n{i18n.t('poll.vote_prompt', locale=user.locale)}"
+
+            await update.message.reply_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+                disable_web_page_preview=True
+            )
             return
 
-        if poll.is_priority():
-            init_votes(session, poll, user)
-            session.commit()
+        except (ValueError, IndexError):
+            # Invalid poll link format, fall through to normal start
+            pass
 
-        text, keyboard = get_poll_text_and_vote_keyboard(
-            session,
-            poll,
-            user=user,
-        )
+    # Regular start command - show welcome message
+    await update.message.reply_text(
+        i18n.t("misc.start", locale=user.locale),
+        reply_markup=get_main_keyboard(user),
+        parse_mode="Markdown",
+        disable_web_page_preview=True,
+    )
 
-        sent_message = update.message.chat.send_message(
-            text,
-            reply_markup=keyboard,
-            parse_mode="markdown",
-            disable_web_page_preview=True,
-        )
-
-        reference = Reference(
-            poll,
-            ReferenceType.private_vote.name,
-            user=user,
-            message_id=sent_message.message_id,
-        )
-        session.add(reference)
-        session.commit()
+    increase_stat(session, "started")
