@@ -44,7 +44,7 @@ if not os.path.exists(config_path):
     print("Please adjust the configuration file at '~/.config/ultimate_pollbot.toml'")
     sys.exit(1)
 else:
-    config = toml.load(config_path)
+    # config = toml.load(config_path)
 
     config=default_config
 
