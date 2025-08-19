@@ -15,9 +15,9 @@ from pollbot.telegram.keyboard.styling import (
 )
 
 
-def send_styling_message(session: scoped_session, context: CallbackContext) -> None:
+async def send_styling_message(session: scoped_session, context: CallbackContext) -> None:
     """Update the current styling menu message."""
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text=get_poll_text(session, context.poll),
         parse_mode="markdown",
         reply_markup=get_styling_settings_keyboard(context.poll),
@@ -124,11 +124,11 @@ def set_user_order(
 
 
 # Manual option order menu
-def send_option_order_message(
+async def send_option_order_message(
     session: scoped_session, context: CallbackContext
 ) -> None:
     """Update the current styling menu message."""
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text=get_poll_text(session, context.poll),
         parse_mode="markdown",
         reply_markup=get_manual_option_order_keyboard(context.poll),

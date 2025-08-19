@@ -17,10 +17,10 @@ from pollbot.telegram.keyboard.user import (
 )
 
 
-def open_main_menu(_: scoped_session, context: CallbackContext) -> None:
+async def open_main_menu(_: scoped_session, context: CallbackContext) -> None:
     """Open the main menu."""
     keyboard = get_main_keyboard(context.user)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("misc.start", locale=context.user.locale),
         reply_markup=keyboard,
         parse_mode="Markdown",
@@ -28,55 +28,55 @@ def open_main_menu(_: scoped_session, context: CallbackContext) -> None:
     )
 
 
-def open_user_settings(_: scoped_session, context: CallbackContext) -> None:
+async def open_user_settings(_: scoped_session, context: CallbackContext) -> None:
     """Open the user settings."""
     keyboard = get_user_settings_keyboard(context.user)
     text = get_user_settings_text(context.user)
-    context.query.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    await context.query.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 
-def open_language_menu(_: scoped_session, context: CallbackContext) -> None:
+async def open_language_menu(_: scoped_session, context: CallbackContext) -> None:
     """Open the user language selection menu."""
     keyboard = get_user_language_keyboard(context.user)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("settings.change_language", locale=context.user.locale),
         parse_mode="markdown",
         reply_markup=keyboard,
     )
 
 
-def list_polls(session: scoped_session, context: CallbackContext) -> None:
+async def list_polls(session: scoped_session, context: CallbackContext) -> None:
     """List all open polls of a user."""
     text, keyboard = get_poll_list(session, context.user, 0)
-    context.query.message.chat.send_message(text, reply_markup=keyboard)
+    await context.query.message.chat.send_message(text, reply_markup=keyboard)
 
 
-def list_closed_polls(session: scoped_session, context: CallbackContext) -> None:
-    """List all open polls of a user."""
+async def list_closed_polls(session: scoped_session, context: CallbackContext) -> None:
+    """List all closed polls of a user."""
     text, keyboard = get_poll_list(session, context.user, 0, closed=True)
-    context.query.message.chat.send_message(text, reply_markup=keyboard)
+    await context.query.message.chat.send_message(text, reply_markup=keyboard)
 
 
-def list_polls_navigation(session: scoped_session, context: CallbackContext) -> None:
+async def list_polls_navigation(session: scoped_session, context: CallbackContext) -> None:
     """List all open polls of a user."""
     text, keyboard = get_poll_list(session, context.user, int(context.payload))
-    context.query.message.edit_text(text, reply_markup=keyboard)
+    await context.query.message.edit_text(text, reply_markup=keyboard)
 
 
-def list_closed_polls_navigation(
+async def list_closed_polls_navigation(
     session: scoped_session, context: CallbackContext
 ) -> None:
     """List all open polls of a user."""
     text, keyboard = get_poll_list(
         session, context.user, int(context.payload), closed=True
     )
-    context.query.message.edit_text(text, reply_markup=keyboard)
+    await context.query.message.edit_text(text, reply_markup=keyboard)
 
 
-def open_help(_: scoped_session, context: CallbackContext) -> None:
+async def open_help(_: scoped_session, context: CallbackContext) -> None:
     """Open the help text."""
     text, keyboard = get_help_text_and_keyboard(context.user, "intro")
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text,
         parse_mode="Markdown",
         reply_markup=keyboard,
@@ -108,18 +108,18 @@ def change_user_language(session: scoped_session, context: CallbackContext) -> s
     return i18n.t("user.language_changed", locale=context.user.locale)
 
 
-def delete_all_confirmation(_: scoped_session, context: CallbackContext) -> None:
+async def delete_all_confirmation(_: scoped_session, context: CallbackContext) -> None:
     keyboard = get_delete_all_confirmation_keyboard(context.user)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("settings.user.delete_all_confirmation", locale=context.user.locale),
         parse_mode="markdown",
         reply_markup=keyboard,
     )
 
 
-def delete_closed_confirmation(_: scoped_session, context: CallbackContext) -> None:
+async def delete_closed_confirmation(_: scoped_session, context: CallbackContext) -> None:
     keyboard = get_delete_all_confirmation_keyboard(context.user, closed=True)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("settings.user.delete_closed_confirmation", locale=context.user.locale),
         parse_mode="markdown",
         reply_markup=keyboard,
@@ -148,12 +148,12 @@ def delete_closed(session: scoped_session, context: CallbackContext) -> str:
     return i18n.t("deleted.closed_polls", locale=context.user.locale)
 
 
-def delete_user_second_confirmation(
+async def delete_user_second_confirmation(
     _: scoped_session, context: CallbackContext
 ) -> None:
     """Delete everything of a user and ban them forever."""
     user = context.user
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("misc.final_deletion_warning", locale=user.locale),
         reply_markup=get_delete_user_final_confirmation_keyboard(user),
         parse_mode="markdown",

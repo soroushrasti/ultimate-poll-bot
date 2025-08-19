@@ -83,7 +83,7 @@ def owner_pick_date_option(
 
 
 @poll_required
-def pick_creation_date(
+async def pick_creation_date(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Pick an option during poll creation."""
@@ -91,14 +91,14 @@ def pick_creation_date(
 
 
 @poll_required
-def pick_creation_weekday(
+async def pick_creation_weekday(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     return
 
 
 @poll_required
-def pick_additional_date(
+async def pick_additional_date(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Pick an option after creating the poll."""
@@ -106,14 +106,14 @@ def pick_additional_date(
 
 
 @poll_required
-def pick_additional_weekday(
+async def pick_additional_weekday(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     return
 
 
 @poll_required
-def pick_external_date(
+async def pick_external_date(
     session: scoped_session, context: CallbackContext, poll: Poll
 ) -> Optional[str]:
     """Add or remove a date option during creation."""
@@ -138,7 +138,7 @@ def pick_external_date(
 
 
 @poll_required
-def pick_due_date(
+async def pick_due_date(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> Optional[str]:
     """Set the due date for a poll."""
@@ -149,13 +149,13 @@ def pick_due_date(
     due_date = datetime.combine(picked_date, time(hour=12, minute=00))
     if due_date == poll.due_date:
         poll.set_due_date(None)
-        context.query.answer(
+        await context.query.answer(
             i18n.t("callback.due_date_removed", locale=poll.user.locale)
         )
     else:
         poll.set_due_date(due_date)
 
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text=get_settings_text(context.poll),
         parse_mode="markdown",
         reply_markup=get_due_date_datepicker_keyboard(poll, picked_date),
@@ -181,7 +181,7 @@ async def set_previous_month(_: scoped_session, context: CallbackContext, poll: 
     this_month = date.fromisoformat(context.data[2])
     datepicker_context = DatepickerContext(int(context.data[3]))
 
-    previous_month = this_month - relativedelta(months=1)
+    previous_month = this_month - relativedeltFa(months=1)
     update_datepicker(context, poll, datepicker_context, previous_month)
     return i18n.t(
         "callback.date_changed", locale=poll.locale, date=previous_month.isoformat()

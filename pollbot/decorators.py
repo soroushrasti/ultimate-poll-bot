@@ -7,7 +7,9 @@ def poll_required(function):
 
     def wrapper(session, context):
         if context.poll is None or context.poll.delete is not None:
-            return i18n.t("callback.poll_no_longer_exists", locale=context.user.locale)
+            async def error_response(*args, **kwargs):
+                return i18n.t("callback.poll_no_longer_exists", locale=context.user.locale)
+            return error_response
 
         return function(session, context, context.poll)
 

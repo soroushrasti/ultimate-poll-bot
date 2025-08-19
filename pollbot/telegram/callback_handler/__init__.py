@@ -1,4 +1,5 @@
 """Callback query handling."""
+import asyncio
 from datetime import date
 
 from sqlalchemy.exc import IntegrityError
@@ -27,7 +28,9 @@ async def handle_callback_query(update, context: ContextTypes.DEFAULT_TYPE):
     increase_user_stat(session, callback_context.user, "callback_calls")
     session.commit()
 
-    response = await callback_mapping[callback_context.callback_type](session, callback_context)
+    response = callback_mapping[callback_context.callback_type](session, callback_context)
+    if asyncio.iscoroutine(response):
+        response = await response
 
     # Callback handler functions always return the callback answer
     if response is not None and callback_context.callback_type != CallbackType.vote:
@@ -68,7 +71,9 @@ async def handle_async_callback_query(update, context: ContextTypes.DEFAULT_TYPE
     increase_user_stat(session, callback_context.user, "callback_calls")
 
     try:
-        response = await async_callback_mapping[callback_context.callback_type](session, callback_context)
+        response = async_callback_mapping[callback_context.callback_type](session, callback_context)
+        if asyncio.iscoroutine(response):
+            response = await response
 
         # Callback handler functions always return the callback answer
         if response is not None:

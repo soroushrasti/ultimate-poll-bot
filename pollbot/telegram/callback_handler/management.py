@@ -1,6 +1,7 @@
 """Callback functions needed during creation of a Poll."""
 from datetime import datetime
 from typing import Optional
+import asyncio
 
 from sqlalchemy.orm.scoping import scoped_session
 
@@ -31,6 +32,7 @@ async def delete_poll_with_messages(
     """Permanently delete the poll."""
     poll.delete = PollDeletionMode.WITH_MESSAGES.name
     session.commit()
+    await asyncio.sleep(0)  # Ensure this is a coroutine
 
     return i18n.t("callback.deleted", locale=context.user.locale)
 

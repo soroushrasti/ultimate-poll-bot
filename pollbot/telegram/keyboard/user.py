@@ -57,22 +57,22 @@ def get_main_keyboard(user: User) -> InlineKeyboardMarkup:
             )
         ]
     )
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                text=i18n.t("keyboard.show_help", locale=user.locale),
-                callback_data=f"{CallbackType.open_help.value}:0:0",
-            )
-        ]
-    )
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                text=i18n.t("keyboard.help_me_out", locale=user.locale),
-                callback_data=f"{CallbackType.donate.value}:0:0",
-            )
-        ]
-    )
+    # buttons.append(
+    #     [
+    #         InlineKeyboardButton(
+    #             text=i18n.t("keyboard.show_help", locale=user.locale),
+    #             callback_data=f"{CallbackType.open_help.value}:0:0",
+    #         )
+    #     ]
+    # )
+    # buttons.append(
+    #     [
+    #         InlineKeyboardButton(
+    #             text=i18n.t("keyboard.help_me_out", locale=user.locale),
+    #             callback_data=f"{CallbackType.donate.value}:0:0",
+    #         )
+    #     ]
+    # )
 
     return InlineKeyboardMarkup(buttons)
 

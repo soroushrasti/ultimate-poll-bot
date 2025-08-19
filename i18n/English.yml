@@ -248,7 +248,7 @@ delete:
 user:
     language_changed: 'Language changed'
 misc:
-    start: "🌟Welcome to the *ULTIMATE* pollbot 🌟\n\nJust type /create or click the button below to start creating polls. Everything is explained underway.\n\n🌐 You can pick another language under settings 🌐\n❓ Click /help for more explanations ❓\n\n💡 _Did you know_: You can now also send me a normal Telegram poll! 💡\n\nThis bot is open-source on [GitHub](https://github.com/).\n"
+    start: "🌟Welcome to the this poll bot 🌟\n\nJust type /create or click the button below to start creating polls. Everything is explained underway.\n\n🌐 You can pick another language under settings 🌐\n❓ Click /help for more explanations ❓\n\n"
     help:
         intro: "There are quite a few settings for your polls.\nJust pick the category you're interested in or just read everything 😉.\n\nIn case you just want to create a poll, type /create\n"
         creation: "🌟*Creation:*\n\nTo create a new poll, just write or click /create.\nFor each poll you can specify several initial settings\n\n*Poll type:* The various types are explained in detail in the poll type menu.\n*Anonymity:* You can anonymize your poll, which results in no names being displayed! This is permanent and for all parties.\n*Visible results:* In this mode, votes only become visible after closing the poll. This is needed to avoid the possibility of [tactical voting](https://en.wikipedia.org/wiki/Tactical_voting) and to prevent [Anchoring](https://en.wikipedia.org/wiki/Anchoring)\n\n-> *Attention: A closed poll with invisible results stays closed!:*\nReopening a poll would allow a user, specifically the poll creator, to look at the votes, and place his own vote in a manner, that would result in a possible advantage for him (tactical voting).\n"

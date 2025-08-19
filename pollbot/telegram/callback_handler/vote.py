@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, ObjectDeletedError, StaleDataError
 from sqlalchemy.orm.scoping import scoped_session
 
+from pollbot.display.poll.compilation import get_poll_text_and_vote_keyboard
 from pollbot.enums import CallbackResult, PollType
 from pollbot.helper.stats import increase_stat
 from pollbot.i18n import i18n
@@ -83,6 +84,15 @@ async def handle_vote(
 
             # Update all poll messages (synchronous function, don't await)
             update_poll_messages(session, context.bot, poll)
+
+            # Show updated poll results to the user immediately
+            text, keyboard = get_poll_text_and_vote_keyboard(session, poll, context.user)
+            await context.query.message.edit_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+                disable_web_page_preview=True
+            )
             return None
 
         return i18n.t("callback.vote.unchanged", locale=context.user.locale)

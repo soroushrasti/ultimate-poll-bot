@@ -6,12 +6,12 @@ from pollbot.models import Option
 from pollbot.telegram.callback_handler.context import CallbackContext
 
 
-def switch_help(_: scoped_session, context: CallbackContext) -> None:
+async def switch_help(_: scoped_session, context: CallbackContext) -> None:
     """Show the correct help section."""
     user = context.user
     text, keyboard = get_help_text_and_keyboard(user, str(context.action))
 
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text,
         parse_mode="Markdown",
         reply_markup=keyboard,

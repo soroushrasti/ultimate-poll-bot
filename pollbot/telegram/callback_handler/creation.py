@@ -33,25 +33,25 @@ from pollbot.telegram.keyboard.date_picker import get_creation_datepicker_keyboa
 from .user import init_poll
 
 
-def open_init_text(message: Message, poll: Poll) -> None:
+async def open_init_text(message: Message, poll: Poll) -> None:
     """Open the initial poll creation message."""
     if poll.created_from_native:
         keyboard = get_native_poll_merged_keyboard(poll)
-        message.edit_text(
+        await message.edit_text(
             get_native_poll_merged_text(poll),
             parse_mode="markdown",
             reply_markup=keyboard,
         )
     else:
         keyboard = get_init_keyboard(poll)
-        message.edit_text(
+        await message.edit_text(
             get_init_text(poll), parse_mode="markdown", reply_markup=keyboard
         )
 
 
-def open_anonymization_settings(message: Message, poll: Poll) -> None:
+async def open_anonymization_settings(message: Message, poll: Poll) -> None:
     """Open the initial poll anonymization settings."""
-    message.edit_text(
+    await message.edit_text(
         get_init_anonymziation_settings_text(poll),
         parse_mode="markdown",
         reply_markup=get_init_settings_keyboard(poll),
@@ -60,35 +60,35 @@ def open_anonymization_settings(message: Message, poll: Poll) -> None:
 
 
 @poll_required
-def back_to_creation_init(session, context, poll):
+async def back_to_creation_init(session, context, poll):
     """Open the initial poll creation message."""
-    open_init_text(context.query.message, poll)
+    await open_init_text(context.query.message, poll)
 
 
 @poll_required
-def open_init_anonymization_settings(session, context, poll):
+async def open_init_anonymization_settings(session, context, poll):
     """Open the anonymization settings for this poll."""
-    open_anonymization_settings(context.query.message, poll)
+    await open_anonymization_settings(context.query.message, poll)
 
 
 @poll_required
-def ask_description(session, context, poll):
+async def ask_description(session, context, poll):
     """Asks user for description of the poll, in case the name was already supplied."""
     context.user.expected_input = ExpectedInput.description.name
     keyboard = get_skip_description_keyboard(poll)
-    context.tg_chat.send_message(
+    await context.tg_chat.send_message(
         i18n.t("creation.description", locale=context.user.locale),
         reply_markup=keyboard,
     )
 
 
 @poll_required
-def skip_description(session, context, poll):
+async def skip_description(session, context, poll):
     """Skip description creation step."""
     if len(poll.options) == 0:
         context.user.expected_input = ExpectedInput.options.name
         session.commit()
-        context.query.message.edit_text(
+        await context.query.message.edit_text(
             i18n.t("creation.option.first", locale=context.user.locale),
             reply_markup=get_open_datepicker_keyboard(poll),
         )
@@ -97,19 +97,19 @@ def skip_description(session, context, poll):
 
 
 @poll_required
-def show_poll_type_keyboard(session, context, poll):
+async def show_poll_type_keyboard(session, context, poll):
     """Show the keyboard to change poll type."""
 
     poll = session.query(Poll).get(context.payload)
 
     keyboard = get_change_poll_type_keyboard(poll)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         get_poll_type_help_text(poll), parse_mode="markdown", reply_markup=keyboard
     )
 
 
 @poll_required
-def change_poll_type(session, context, poll):
+async def change_poll_type(session, context, poll):
     """Change the vote type of the poll.
 
     This is only possible at the very beginning of the creation.
@@ -119,7 +119,7 @@ def change_poll_type(session, context, poll):
 
     poll.poll_type = PollType(context.action).name
 
-    open_init_text(context.query.message, poll)
+    await open_init_text(context.query.message, poll)
 
 
 @poll_required
@@ -167,13 +167,13 @@ async def all_options_entered(session, context, poll):
 
 
 @poll_required
-def open_creation_datepicker(session, context, poll):
+async def open_creation_datepicker(session, context, poll):
     """Open the datepicker during the creation of a poll."""
     keyboard = get_creation_datepicker_keyboard(poll, date.today())
     # Switch from new option by text to new option via datepicker
     message = context.query.message
     if context.user.expected_input != ExpectedInput.options.name:
-        message.edit_text(
+        await message.edit_text(
             i18n.t("creation.option.finished", locale=context.user.locale)
         )
         return
@@ -186,11 +186,11 @@ def open_creation_datepicker(session, context, poll):
         error_message = i18n.t("misc.too_many_options", locale=context.user.locale)
         raise RollbackException(error_message)
 
-    message.edit_text(text, parse_mode="markdown", reply_markup=keyboard)
+    await message.edit_text(text, parse_mode="markdown", reply_markup=keyboard)
 
 
 @poll_required
-def close_creation_datepicker(session, context, poll):
+async def close_creation_datepicker(session, context, poll):
     """Close the datepicker during the creation of a poll."""
     user = context.user
     if len(poll.options) == 0:
@@ -203,11 +203,11 @@ def close_creation_datepicker(session, context, poll):
     message = context.query.message
     # Replace the message completely, since all options have already been entered
     if user.expected_input != ExpectedInput.date.name:
-        message.edit_text(i18n.t("creation.option.finished", locale=user.locale))
+        await message.edit_text(i18n.t("creation.option.finished", locale=user.locale))
         return
 
     user.expected_input = ExpectedInput.options.name
-    message.edit_text(text, parse_mode="markdown", reply_markup=keyboard)
+    await message.edit_text(text, parse_mode="markdown", reply_markup=keyboard)
 
 
 async def cancel_creation(session: scoped_session, context: CallbackContext) -> Optional[str]:

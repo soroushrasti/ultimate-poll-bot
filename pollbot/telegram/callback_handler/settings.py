@@ -1,7 +1,8 @@
 """Callback functions needed during creation of a Poll."""
 from datetime import date
+import asyncio
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, scoped_session
 
 from pollbot.db import get_session
 from pollbot.decorators import poll_required
@@ -58,6 +59,7 @@ async def make_anonymous(
     poll.anonymous = True
     if not poll.show_percentage and not poll.show_option_votes:
         poll.show_percentage = True
+    await asyncio.sleep(0)
 
     get_session().commit()
     update_poll_messages(get_session(), context.bot, poll)
@@ -79,11 +81,11 @@ async def open_language_picker(
 
 @poll_required
 async def change_poll_language(
-    context: CallbackContext, poll: Poll
+    session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Open the language picker."""
     poll.locale = context.action
-    get_session().commit()
+    session.commit()
     await send_settings_message(context)
 
 
@@ -111,13 +113,13 @@ async def show_styling_menu(
 
 
 @poll_required
-def expect_new_option(_: Session, context: CallbackContext, poll: Poll) -> None:
+async def expect_new_option(_: Session, context: CallbackContext, poll: Poll) -> None:
     """Send a text and tell the user that we expect a new option."""
     user = context.user
     user.expected_input = ExpectedInput.new_option.name
     user.current_poll = poll
 
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text=i18n.t("creation.option.first", locale=user.locale),
         parse_mode="markdown",
         reply_markup=get_add_option_keyboard(poll),
@@ -125,12 +127,12 @@ def expect_new_option(_: Session, context: CallbackContext, poll: Poll) -> None:
 
 
 @poll_required
-def open_new_option_datepicker(
+async def open_new_option_datepicker(
     _: Session, context: CallbackContext, poll: Poll
 ) -> None:
     """Send a text and tell the user that we expect a new option."""
     keyboard = get_add_option_datepicker_keyboard(poll, date.today())
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         text=get_datepicker_text(poll),
         parse_mode="markdown",
         reply_markup=keyboard,
@@ -138,12 +140,12 @@ def open_new_option_datepicker(
 
 
 @poll_required
-def show_remove_options_menu(
+async def show_remove_options_menu(
     _: Session, context: CallbackContext, poll: Poll
 ) -> None:
     """Show the menu for removing options."""
     keyboard = get_remove_option_keyboard(poll)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("settings.remove_options", locale=poll.user.locale),
         parse_mode="markdown",
         reply_markup=keyboard,
@@ -182,11 +184,14 @@ async def toggle_allow_new_options(
 
 @poll_required
 async def toggle_allow_sharing(
-    context: CallbackContext, poll: Poll
+    session: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Toggle the visibility of the percentage bar."""
+    # Reattach the poll object to the current session
+    poll = session.merge(poll)
+
     poll.allow_sharing = not poll.allow_sharing
 
-    get_session().commit()
-    update_poll_messages(get_session(), context.bot, poll)
+    session.commit()
+    update_poll_messages(session, context.bot, poll)
     await send_settings_message(context)

@@ -11,10 +11,10 @@ from pollbot.telegram.callback_handler.context import CallbackContext
 from pollbot.telegram.keyboard.user import get_admin_settings_keyboard
 
 
-def open_admin_settings(session: scoped_session, context: CallbackContext) -> None:
+async def open_admin_settings(session: scoped_session, context: CallbackContext) -> None:
     """Open the main menu."""
     keyboard = get_admin_settings_keyboard(context.user)
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         stats(session),
         reply_markup=keyboard,
         parse_mode="Markdown",

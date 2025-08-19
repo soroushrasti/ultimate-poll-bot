@@ -105,7 +105,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Search polls
     polls = session.query(Poll) \
         .filter(Poll.user == user) \
-        .filter(Poll.deleted.is_(False))
+        .filter(Poll.delete.is_(None))
 
     if not closed_polls:
         polls = polls.filter(Poll.closed.is_(False))

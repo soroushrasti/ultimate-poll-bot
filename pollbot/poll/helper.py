@@ -42,7 +42,7 @@ def clone_poll(session: scoped_session, original_poll: Poll) -> Poll:
     return new_poll
 
 
-def remove_old_references(
+async def remove_old_references(
     session: scoped_session, bot: Bot, poll: Poll, user: User
 ) -> None:
     """Remove old references in private chats."""
@@ -55,7 +55,7 @@ def remove_old_references(
 
     for reference in references:
         try:
-            bot.delete_message(
+            await bot.delete_message(
                 chat_id=reference.user_id, message_id=reference.message_id
             )
         except Forbidden:

@@ -41,10 +41,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user.started = True
 
     # Handle poll sharing via deep links
-    if text.startswith("poll_"):
+    if text:
         try:
-            poll_id = int(text.split("_")[1])
-            poll = session.query(Poll).get(poll_id)
+            # Extract UUID from the deep link
+            poll_uuid = text.split("-")[0]
+            poll = session.query(Poll).filter_by(uuid=poll_uuid).one_or_none()
 
             if poll is None:
                 await update.message.reply_text(
@@ -53,7 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return
 
             # Log poll access
-            logger.info(f"Poll accessed via deep link - Poll ID: {poll.id}, User: {user.id}")
+            logger.info(f"Poll accessed via deep link - Poll UUID: {poll.uuid}, User: {user.id}")
 
             # Show the poll to the user with voting options
             text, keyboard = get_poll_text_and_vote_keyboard(session, poll, user)
@@ -70,11 +71,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
 
-        except (ValueError, IndexError):
-            # Invalid poll link format, fall through to normal start
-            pass
+        except Exception as e:
+            logger.error(f"Error handling deep link: {e}")
+            await update.message.reply_text(
+                i18n.t("poll.invalid_link", locale=user.locale),
+            )
+            return
 
-    # Regular start command - show welcome message
+    # Default start message
     await update.message.reply_text(
         i18n.t("misc.start", locale=user.locale),
         reply_markup=get_main_keyboard(user),

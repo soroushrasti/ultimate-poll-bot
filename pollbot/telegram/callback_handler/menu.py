@@ -99,6 +99,13 @@ async def show_deletion_confirmation(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Show the delete confirmation message."""
+    import logging
+
+    # Log the poll and keyboard details
+    logging.debug(f"Poll: {poll}")
+    keyboard = get_deletion_confirmation(poll)
+    logging.debug(f"Generated Keyboard: {keyboard}")
+
     await context.query.message.edit_text(
         i18n.t("management.delete", locale=poll.user.locale),
         reply_markup=get_deletion_confirmation(poll),
@@ -126,7 +133,7 @@ async def show_menu(session: scoped_session, context: CallbackContext, poll: Pol
         reply_markup=get_management_keyboard(poll),
         disable_web_page_preview=True,
     )
-    remove_old_references(session, context.bot, poll, context.user)
+    await remove_old_references(session, context.bot, poll, context.user)
 
     reference = Reference(
         poll, ReferenceType.admin.name, user=context.user, message_id=message.message_id

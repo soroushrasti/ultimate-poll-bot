@@ -6,21 +6,20 @@ import sys
 import toml
 
 default_config = {
-    "telegram": {
-        "bot_name": "soroush_s_bot",
-        "api_key": "7814140344:AAHVSofi8vgJpxE-ABACz98mIq5d1BPU4RQ",
-        "worker_count": 20,
-        "admin": "soroush",
-        "allow_private_vote": True,  # Changed from False to True
-        "max_user_votes_per_day": 200,
-        "max_inline_shares": 20,
-        "max_polls_per_user": 200,
+"telegram": {
+        "bot_name": os.getenv("TELEGRAM_BOT_NAME", "soroush_s_bot"),
+        "api_key": os.getenv("TELEGRAM_API_KEY", "7814140344:AAHVSofi8vgJpxE-ABACz98mIq5d1BPU4RQ"),
+        "worker_count": int(os.getenv("TELEGRAM_WORKER_COUNT", 20)),
+        "admin": os.getenv("TELEGRAM_ADMIN", "soroush"),
+        "allow_private_vote": os.getenv("TELEGRAM_ALLOW_PRIVATE_VOTE", "True") == "True",
+        "max_user_votes_per_day": int(os.getenv("TELEGRAM_MAX_USER_VOTES_PER_DAY", 200)),
+        "max_inline_shares": int(os.getenv("TELEGRAM_MAX_INLINE_SHARES", 20)),
+        "max_polls_per_user": int(os.getenv("TELEGRAM_MAX_POLLS_PER_USER", 200)),
     },
-
     "database": {
-        "sql_uri": "postgresql://pollbot:pollbot@localhost:5432/pollbot",
-        "connection_count": 20,
-        "overflow_count": 10
+        "sql_uri": os.getenv("DATABASE_SQL_URI", "postgresql://pollbot:pollbot@localhost:5432/pollbot"),
+        "connection_count": int(os.getenv("DATABASE_CONNECTION_COUNT", 20)),
+        "overflow_count": int(os.getenv("DATABASE_OVERFLOW_COUNT", 10)),
     },
     "logging": {
         "sentry_enabled": False,
@@ -54,3 +53,4 @@ else:
         for option, value in category.items():
             if option not in config[key]:
                 config[key][option] = value
+

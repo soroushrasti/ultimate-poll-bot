@@ -17,6 +17,9 @@ from pollbot.poll.update import try_update_reference
 from pollbot.telegram.callback_handler.context import CallbackContext
 from pollbot.telegram.keyboard.date_picker import get_external_datepicker_keyboard
 from pollbot.telegram.keyboard.external import get_external_add_option_keyboard
+from pollbot.telegram.keyboard.helper import get_start_button_payload
+from pollbot.enums import StartAction
+from pollbot.config import config
 
 
 @poll_required
@@ -56,39 +59,36 @@ async def activate_notification(
         notification.poll = poll
 
     get_session().commit()
-    message.edit_text(i18n.t("external.notification.activated", locale=poll.locale))
+    await message.edit_text(i18n.t("external.notification.activated", locale=poll.locale))
     increase_stat(get_session(), "notifications")
 
 
 @poll_required
-def open_external_datepicker(
+async def open_external_datepicker(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> Optional[str]:
     """This opens the datepicker for non-admin users when they're adding options."""
     keyboard = get_external_datepicker_keyboard(poll, date.today())
-    # Switch from new option by text to new option via datepicker
     message = context.query.message
     if context.user.expected_input != ExpectedInput.new_user_option.name:
-        message.edit_text(
+        await message.edit_text(
             i18n.t("creation.option.finished", locale=context.user.locale)
         )
         return
-
-    message.edit_text(
+    await message.edit_text(
         get_datepicker_text(poll), parse_mode="markdown", reply_markup=keyboard
     )
 
 
 @poll_required
-def open_external_menu(
+async def open_external_menu(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """This opens the option adding menu for non-admin users."""
     context.user.expected_input = ExpectedInput.new_user_option.name
     context.user.current_poll = poll
     get_session().commit()
-
-    context.query.message.edit_text(
+    await context.query.message.edit_text(
         i18n.t("creation.option.first", locale=poll.locale),
         parse_mode="markdown",
         reply_markup=get_external_add_option_keyboard(poll),
@@ -96,19 +96,18 @@ def open_external_menu(
 
 
 @poll_required
-def external_cancel(
+async def external_cancel(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Closes the option adding menu for non-admin users."""
     context.user.expected_input = None
     context.user.current_poll = None
     get_session().commit()
-
-    context.query.message.edit_text(i18n.t("external.done", locale=poll.locale))
+    await context.query.message.edit_text(i18n.t("external.done", locale=poll.locale))
 
 
 @poll_required
-def update_shared(
+async def update_shared(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
     """Fallback button to update a poll that might not sync after sharing.
@@ -143,23 +142,27 @@ def update_shared(
             # Just ignore those.
             get_session().rollback()
 
-    try_update_reference(get_session(), context.bot, poll, reference)
+    await try_update_reference(get_session(), context.bot, poll, reference)
 
 
 @poll_required
-def copy_poll_link(
+async def copy_poll_link(
     _: scoped_session, context: CallbackContext, poll: Poll
 ) -> None:
-    """Send the poll link to the user for easy copying."""
+    """Send the poll link to the user for easy copying and log the sharing event."""
     from pollbot.telegram.keyboard.helper import get_start_button_payload
     from pollbot.enums import StartAction
     from pollbot.config import config
+    import logging
 
     bot_username = config["telegram"]["bot_name"]
     share_payload = get_start_button_payload(poll, StartAction.vote)
     deep_link = f"https://t.me/{bot_username}?start={share_payload}"
 
     message = f"🔗 **Poll Link:**\n`{deep_link}`\n\nShare this link with anyone to let them vote on your poll!"
+
+    # Log the sharing event
+    logging.info(f"Poll shared: Poll ID: {poll.id}, Name: {poll.name}, Link: {deep_link}")
 
     context.query.answer(
         "Link copied! You can now share this with others.",
