@@ -8,7 +8,7 @@ import toml
 default_config = {
 "telegram": {
         "bot_name": os.getenv("TELEGRAM_BOT_NAME", "soroush_s_bot"),
-        "api_key": os.getenv("TELEGRAM_API_KEY", "7814140344:AAHVSofi8vgJpxE-ABACz98mIq5d1BPU4RQ"),
+        "api_key": os.getenv("TELEGRAM_API_KEY", ""),
         "worker_count": int(os.getenv("TELEGRAM_WORKER_COUNT", 20)),
         "admin": os.getenv("TELEGRAM_ADMIN", "soroush"),
         "allow_private_vote": os.getenv("TELEGRAM_ALLOW_PRIVATE_VOTE", "True") == "True",
