@@ -36,21 +36,12 @@ default_config = {
     },
 }
 
-config_path = os.path.expanduser("~/.config/ultimate_pollbot.toml")
 
-if not os.path.exists(config_path):
-    with open(config_path, "w") as file_descriptor:
-        toml.dump(default_config, file_descriptor)
-    print("Please adjust the configuration file at '~/.config/ultimate_pollbot.toml'")
-    sys.exit(1)
-else:
-    # config = toml.load(config_path)
+config=default_config
 
-    config=default_config
-
-    # Set default values for any missing keys in the loaded config
-    for key, category in default_config.items():
-        for option, value in category.items():
-            if option not in config[key]:
-                config[key][option] = value
+# Set default values for any missing keys in the loaded config
+for key, category in default_config.items():
+    for option, value in category.items():
+        if option not in config[key]:
+            config[key][option] = value
 
